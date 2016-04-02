@@ -88,24 +88,24 @@ public class LivrC2 {
 	
 	Recomp Recomp;
 	@HTCN(id = 9, single = 'R') public static class Recomp extends Base  {
-		@HT(id = 2) private int recomp;
+		@HT(id = 2) public int recomp;
 	}
 	
 	ArrayList<Prix> Prix;
 	@HTCN(id = 1) public static class Prix extends Base {
 		@HT(id = 2) public int prod;
-		@HT(id = 3) private int dispo;
-		@HT(id = 4) private int pu;
-		@HT(id = 5) private int poids;
-		@HT(id = 8) private int qmax;
-		@HT(id = 10) private int parite;
-		@HT(id = 11) private long dhChange;
+		@HT(id = 3) public int dispo;
+		@HT(id = 4) public int pu;
+		@HT(id = 5) public int poids;
+		@HT(id = 8) public int qmax;
+		@HT(id = 10) public int parite;
+		@HT(id = 11) public long dhChange;
 	}
 
 	ExclC ExclC;
 	@HTCN(id = 2, single = 'X') public static class ExclC extends Base {
-		@HT(id = 2) private ArrayInt prods;
-		@HT(id = 3) private int local;
+		@HT(id = 2) public ArrayInt prods;
+		@HT(id = 3) public int local;
 	}
 
 	ArrayList<AcApPr> AcApPr;
@@ -118,7 +118,7 @@ public class LivrC2 {
 		@HT(id = 11) public int qteS;
 		@HT(id = 14) public int poids;
 		@HT(id = 18) public int prix;
-		@HT(id = 19) private ArrayInt lprix;
+		@HT(id = 19) public ArrayInt lprix;
 		@HT(id = 30) public int nblg;
 		@HT(id = 31) public int flags;
 	}
@@ -134,35 +134,49 @@ public class LivrC2 {
 		@HT(id = 24) public int lprixByGac;
 		@HT(id = 25) public int charge;
 		@HT(id = 26) public int decharge;
-		@HT(id = 22) private ArrayInt lprix;
-		@HT(id = 23) private ArrayInt lprixC;
+		@HT(id = 22) public ArrayInt lprix;
+		@HT(id = 23) public ArrayInt lprixC;
 	}
 	
 	ArrayList<AcAp> AcAp;
 	@HTCN(id = 12) public class AcAp extends Ac {
 		@HT(id = 3) public int ap;
 		@HT(id = 5) public int ami;
-		@HT(id = 45) private ArrayInt amisPour;
-		@HT(id = 46) private ArrayInt amisPar;
+		@HT(id = 45) public ArrayInt amisPour;
+		@HT(id = 46) public ArrayInt amisPar;
 		@HT(id = 47) public int prixPG;
 		@HT(id = 62) public String intitule;
 	}
 		
+	public static String readFile(String column, String type) throws Exception {
+		FileInputStream fis = new FileInputStream(column + "_" + type + ".json");
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		byte[] buf = new byte[8192];
+		int l = 0;
+		while((l = fis.read(buf)) != -1) bos.write(buf,0, l);
+		fis.close();
+		byte[] bytes = bos.toByteArray();
+		String text = new String(bytes, "UTF-8");
+		System.out.println("lg json1 = " + bytes.length);
+		return text;
+	}
+	
+	public static void writeFile(String column, String type, int idx, byte[] bytes)  throws Exception {
+		FileOutputStream fos = new FileOutputStream(column + "_" + type + "_" + idx + ".json.gz");
+		ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+		int l = 0;
+		byte[] buf = new byte[8192];
+		while((l = bis.read(buf)) != -1) fos.write(buf,0, l);
+		bis.close();
+		fos.close();
+	}
+	
 	public static void main(String[] args) {
 		try {
 			String type = "LivrC";
 			// String line = "P.1.";
 			String column = "408.10.";
-			FileInputStream fis = new FileInputStream(column + "_" + type + ".json");
-			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			byte[] buf = new byte[8192];
-			int l = 0;
-			while((l = fis.read(buf)) != -1) bos.write(buf,0, l);
-			fis.close();
-			byte[] bytes = bos.toByteArray();
-			String text = new String(bytes, "UTF-8");
-			System.out.println("lg json1 = " + bytes.length);
-			
+			String text = readFile(column, type);
 	        GsonBuilder builder = new GsonBuilder();
 	        Gson gson = builder.create();
 	        LivrC2 c = null;
@@ -175,6 +189,7 @@ public class LivrC2 {
 	        
 			long t3 = System.currentTimeMillis();
 			int lg = 0;
+			byte[] bytes = null;
 			byte[] bytes2 = null;
 			for(int i = 0; i < 100; i++) {
 				String s = gson.toJson(c);
@@ -195,12 +210,7 @@ public class LivrC2 {
 			long t6 = System.currentTimeMillis();
 			System.out.println("GZIP : " + (t6 - t5) + "ms. lg gz = " + bytes2.length);
 
-			FileOutputStream fos = new FileOutputStream(column + "_" + type + "_3.json.gz");
-			ByteArrayInputStream bis = new ByteArrayInputStream(bytes2);
-			l = 0;
-			while((l = bis.read(buf)) != -1) fos.write(buf,0, l);
-			bis.close();
-			fos.close();
+			writeFile(column, type, 3, bytes2);
 		
 		} catch (Throwable t){
 			t.printStackTrace();
