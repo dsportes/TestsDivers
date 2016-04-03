@@ -78,7 +78,6 @@ public class LivrC3 extends Document {
 	}
 	
 	public static class AcApPr extends Document.Item {
-		public String id() { return ac + "." + ap + "." + "pr"; }
 		public int ac;
 		public int ap;
 		public int pr;
@@ -93,7 +92,6 @@ public class LivrC3 extends Document {
 	}
 	
 	public static class Prix extends Document.Item {
-		public String id() { return "" + prod; }
 		public int prod;
 		public int dispo;
 		public int pu;
@@ -104,7 +102,6 @@ public class LivrC3 extends Document {
 	}
 
 	public static class Ap extends Document.Item {
-		public String id() { return "" + ap; }
 		public int ap;
 		public int prixPG;
 		public int regltFait;
@@ -347,7 +344,7 @@ public class LivrC3 extends Document {
 			long t5 = System.currentTimeMillis();
 			for(int i = 0; i < max; i++) {
 				ByteArrayOutputStream bos2 = new ByteArrayOutputStream();
-				GZIPOutputStream zos = new GZIPOutputStream(bos2);
+				GZIPOutputStream zos = new GZIPOutputStream(bos2, 128 * 1024);
 				zos.write(bytes);
 				zos.close();
 				bytes2 = bos2.toByteArray();
@@ -380,12 +377,32 @@ public class LivrC3 extends Document {
 			long t10 = System.currentTimeMillis();
 			System.out.println("Re Stringify to JSON : " + (t10 - t9) + "ms. lg json2 = " + lg);
 
+			
+			
 			Ac x = (Ac)d2.getItem("Ac", "45");
 			x.poids = 9999;
 			x.save();
 			jsonAll = d2.serialize(1);
 			System.out.println("Stringify Incr to JSON : lg json2 = " + jsonAll.length());
 			
+			for(String id : d2.getIds("AcApPr")){
+				if (!id.startsWith("45.")) continue;
+				AcApPr acApPr = (AcApPr)d2.getItem("AcApPr", id);
+				Ac ac = (Ac)d2.getItem("Ac", ""+acApPr.ac);
+				AcAp acAp = ac.acAp.get(""+acApPr.ap);
+				Ap ap = (Ap)d2.getItem("Ap", ""+acApPr.ap);
+				ApPr apPr = ap.apPr.get(""+acApPr.pr);
+				int p = acApPr.prix;
+				acApPr.prix += p;
+				acAp.prix += p;
+				apPr.prix += p;
+				ac.save();
+				ap.save();
+				acApPr.save();
+			}
+			jsonAll = d2.serialize(1);
+			System.out.println("Stringify Incr to JSON : lg json3 = " + jsonAll.length());
+
 		} catch (Throwable t){
 			t.printStackTrace();
 		}
