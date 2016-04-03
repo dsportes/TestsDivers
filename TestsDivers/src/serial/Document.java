@@ -13,12 +13,15 @@ public abstract class Document {
 	public static void register(Class<?> documentClass, Class<?>... itemClasses){
 		String cn = documentClass.getSimpleName();
 		DocumentDescriptor dd = DocumentDescriptor.documentDescriptor(cn);
+		if (dd != null) return;
+		dd = new DocumentDescriptor();
+		dd.documentClassName = cn;
+		DocumentDescriptor.ddList.add(dd);
 		dd.documentClass = documentClass;
 		dd.innerClasses = dd.documentClass.getDeclaredClasses();
 		dd.innerClassNames = new String[dd.innerClasses.length];
 		for(int i = 0; i < dd.innerClasses.length; i++)
 			dd.innerClassNames[i] = dd.innerClasses[i].getSimpleName();
-		dd.gson = new Gson();
 		for(Class<?> c : itemClasses)
 			dd.itemDescriptor(c.getSimpleName());
 	}
@@ -32,10 +35,7 @@ public abstract class Document {
 		private static DocumentDescriptor documentDescriptor(String className){
 			for(DocumentDescriptor dd : ddList)
 				if (dd.documentClassName.equals(className)) return dd;
-			DocumentDescriptor dd = new DocumentDescriptor();
-			dd.documentClassName = className;
-			ddList.add(dd);
-			return dd;
+			return null;
 		}
 		
 		private class ItemDescriptor {
@@ -64,112 +64,215 @@ public abstract class Document {
 		private Class<?>[] innerClasses;
 		private String[] innerClassNames;
 		private ArrayList<ItemDescriptor> idList = new ArrayList<ItemDescriptor>();
-		private Gson gson;
+		private Gson gson = new Gson();
 		
 	}
-	
-	private transient DocumentDescriptor documentDescriptor;
-	public transient String id;
-	public transient int version;
-	private transient ItemMap[] items;
-	
-	public Document(String id, int version){
-		documentDescriptor = DocumentDescriptor.documentDescriptor(this.getClass().getSimpleName());
-		this.id = id;
-		this.version = version;
-		items = new ItemMap[documentDescriptor.idList.size()];
+	public static Document newDocument(String className, String id) throws Exception {
+		return newDocument(className, id, null);
 	}
-	public int version() { return version; }
-	public String id() { return id; }
+	public static Document newDocument(String className, String id, String jsonAll) throws Exception {
+		DocumentDescriptor dd = DocumentDescriptor.documentDescriptor(className);
+		if (dd == null) return null;
+		Document d = null;
+		if (jsonAll == null || jsonAll.length() == 0) {
+			d = (Document)dd.documentClass.newInstance();
+			d._documentDescriptor = dd;
+			synchronized (dd.gson) {
+				d._json = dd.gson.toJson(d);
+			}
+			d._id = id;
+			d._documentVersion = 0;
+			d._items = new ItemMap[dd.idList.size()];
+			return d;
+		}
+		int s = jsonAll.indexOf('\n');
+		int vv = Integer.parseInt(jsonAll.substring(1, s));
+		s = s + 2;
+		int i = jsonAll.indexOf('\n', s);
+		if ("null".equals(jsonAll.substring(s, i))) {
+			d = (Document)dd.documentClass.newInstance();
+			d._documentVersion = vv;
+			d._documentDescriptor = dd;
+			synchronized (dd.gson) {
+				d._json = dd.gson.toJson(d);
+			}
+			d._id = id;
+			d._items = new ItemMap[dd.idList.size()];
+			d._version = -1;
+		} else {
+			int vx = jsonAll.lastIndexOf(',', i);
+			String x = jsonAll.substring(s, vx) + "}";
+			synchronized (dd.gson) {
+				d = (Document)dd.gson.fromJson(x, dd.documentClass);
+			}
+			d._documentVersion = vv;
+			d._version = Integer.parseInt(jsonAll.substring(vx + 6, i - 1));
+			d._json = x;
+		}
+		d._id = id;
+		d._documentDescriptor = dd;
+		d._items = new ItemMap[dd.idList.size()];
+		i = i + 4;
+		while (true){
+			int j = jsonAll.indexOf('\n', i);
+			if (j == -1) break;
+			int k = jsonAll.indexOf('\"', i);
+			String key = jsonAll.substring(i, k);
+			int sv = key.indexOf('@');
+			int si = key.indexOf('@', sv + 1);
+			String cn = key.substring(0, sv);
+			String idx = dd.gson.fromJson("\"" + key.substring(si + 1) + "\"", String.class);
+			int v = Integer.parseInt(key.substring(sv + 1, si));
+			d.createItem(cn, idx, v, jsonAll.substring(k + 2, j - 1) );
+			i = j + 4;
+		}
+		return d;
+	}
+
+	private void createItem(String className, String id, int version, String json) throws Exception {
+		if (id == null || id.length() == 0) return;
+		DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.itemDescriptor(className);
+		if (itd == null) return;
+		Item item = (Item) itd.itemClass.newInstance();
+		item._document = this;
+		item._itemDescriptor = itd;
+		item._status = 0;
+		item._version = version;
+		item._json = json;
+		item._id = id;
+		item.insert();
+	}
+
+	private transient DocumentDescriptor _documentDescriptor;
+	private transient String _id;
+	public transient int _documentVersion;
+	private transient int _version;
+	private transient String _json;
+	private transient String _json2;
+	private transient ItemMap[] _items;
+	private transient boolean _hasChanged = false;
+		
+	public int version() { return _documentVersion; }
+	public String id() { return _id; }
+	public boolean hasChanged(){ return _hasChanged; }
 	
-	
-	public Item fromJson(String json, String className) throws Exception {
-		DocumentDescriptor.ItemDescriptor id = documentDescriptor.itemDescriptor(className);
-		if (id == null) return null;
-		synchronized (documentDescriptor.gson) {
-			try {
-				Item item = (Item)documentDescriptor.gson.fromJson(json, id.itemClass);
-				item.document = this;
-				item.itemDescriptor = id;
-				item.json = json;
-				item.id = item.id();
-				item.insert();
+	public Item getItem(String className, String id) throws Exception {
+		if (id == null || id.length() == 0) return null;
+		DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.itemDescriptor(className);
+		if (itd == null) return null;
+		ItemMap im = _items[itd.index];
+		if (im == null){
+			im = new ItemMap();
+			_items[itd.index] = im;
+		}
+		Item item = im.get(id);
+		if (item == null){
+			item = (Item) itd.itemClass.newInstance();
+			item._document = this;
+			item._itemDescriptor = itd;
+			item._status = 2;
+			item._id = id;
+			item.insert();
 			return item;
+		}
+		Item item2 = null;
+		synchronized (_documentDescriptor.gson) {
+			try {
+				item2 = (Item)_documentDescriptor.gson.fromJson(item._json, itd.itemClass);
 			} catch (JsonSyntaxException e){
 				throw new Exception("Json syntax - Document/Item:" 
-						+ documentDescriptor.documentClassName + "/" + className, e);
+						+ _documentDescriptor.documentClassName + "/" + className, e);
 			}
 		}
+		item2._document = this;
+		item2._itemDescriptor = itd;
+		item2._status = 1;
+		item2._id = id;
+		item2._json = item._json;
+		_items[itd.index].put(id, item2);
+		return item2;
 	}
-
-	public Item newItem(String className) throws Exception {
-		DocumentDescriptor.ItemDescriptor id = documentDescriptor.itemDescriptor(className);
-		if (id == null) return null;
-		Item item = (Item) id.itemClass.newInstance();
-		item.document = this;
-		item.itemDescriptor = id;
-		return item;
-	}
-
-	public String fullSerialize(){
+		
+	public String serialize(int vmin){
 		StringBuffer sb = new StringBuffer();
-		sb.append("[");
-		synchronized (documentDescriptor.gson) {
-			sb.append(documentDescriptor.gson.toJson(this));
+		synchronized (_documentDescriptor.gson) {
+			_json2 = _documentDescriptor.gson.toJson(this);
 		}
-		sb.setLength(sb.length() -1);
-		sb.append(",\"v\"=").append(version).append("}\n");		
-		for(int i = 0; i < documentDescriptor.idList.size(); i++){
-			DocumentDescriptor.ItemDescriptor itd = documentDescriptor.idList.get(i);
-			ItemMap im = items[i];
+		_hasChanged = !_json2.equals(_json);
+		if (_hasChanged)
+			_version = _documentVersion + 1;
+		if (vmin >= _version) {
+			sb.append("null\n");
+		} else {
+			sb.append(_json2);
+			sb.setLength(sb.length() - 1);
+			sb.append(",\"_v\"=").append(_version).append("}\n");
+		}
+		for(int i = 0; i < _documentDescriptor.idList.size(); i++){
+			DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.idList.get(i);
+			ItemMap im = _items[i];
 			for(String id : im.keySet()){
 				Item item = im.get(id);
-				int v = item.json2 == null ? version : item.version;
-				String name = itd.itemClassName + "@" + v + "@" + item.id; 
-				sb.append(",{");
-				sb.append(documentDescriptor.gson.toJson(name));
-				sb.append("=").append(item.json2).append("}\n");
+				if (item._status == 2) continue; // créé pas sauvé
+				boolean mod = item.modified();
+				if (mod) {
+					item._version = _documentVersion + 1;
+					_hasChanged = true;
+				}
+				if (vmin >= item._version) continue;
+				String name = _documentDescriptor.gson.toJson(itd.itemClassName + "@" + item._version + "@" + item._id);
+				sb.append(",{").append(name).append("=").append(mod ? item._json2 : item._json).append("}\n");
 			}
 		}
 		sb.append("]");
+		int vv = _hasChanged ? _documentVersion + 1 : _documentVersion;
+		sb.insert(0, "[" + vv + "\n,");
 		return sb.toString();
 	}
 	
 	public abstract static class Item {
-		private transient Document document;
-		private transient DocumentDescriptor.ItemDescriptor itemDescriptor;
-		private transient String json;
-		private transient String id;
-		private transient int version;
-		private transient String json2;
+		private transient Document _document;
+		private transient DocumentDescriptor.ItemDescriptor _itemDescriptor;
+		private transient String _json;
+		private transient String _json2;
+		private transient int _status; // 0:nodata, 1:data, 2:new, 3:tosave
+		private transient String _id;
+		private transient int _version;
 		
-		public int version() { return version; }
-		public abstract String id();
+		public int version() { return _version; }
 		
 		private String toJson(){
-			synchronized (document.documentDescriptor.gson) {
-				return document.documentDescriptor.gson.toJson(this);
+			synchronized (_document._documentDescriptor.gson) {
+				return _document._documentDescriptor.gson.toJson(this);
 			}
 		}
 		
 		private void insert(){
-			int i = itemDescriptor.index;
-			ItemMap im = document.items[i];
+			int i = _itemDescriptor.index;
+			ItemMap im = _document._items[i];
 			if (im == null) {
-				document.items[i] = new ItemMap();
-				im = document.items[i];
+				_document._items[i] = new ItemMap();
+				im = _document._items[i];
 			}
-			im.put(id, this);
+			im.put(_id, this);
+		}
+		
+		public boolean modified() {
+			if (_status != 3) return false;
+			if (_json2 == null){
+				_json2 = toJson();
+				if (_json2.equals(_json)) {
+					_json2 = null;
+					_status = 1;
+					return false;
+				} else
+					return true;
+			} else
+				return true;
 		}
 		
 		public void save(){
-			if (id == null) {
-				id = id();
-				insert();
-			}
-			json2 = toJson();
-			if (json2.equals(json))
-				json2 = null;
+			_status = 3;
 		}
 		
 	}
