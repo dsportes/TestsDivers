@@ -1,17 +1,12 @@
 package serial;
 
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.zip.GZIPOutputStream;
 
 import com.google.gson.Gson;
 
 public class LivrC3 extends Document {
-	static {
-		Document.register(LivrC3.class, LivrC3.Ac.class, LivrC3.AcApPr.class, LivrC3.Prix.class, LivrC3.Ap.class);
-	}
-
+	
 	public int recomp;	
 	public ArrayList<Integer> prods;
 	public int local;
@@ -151,14 +146,16 @@ public class LivrC3 extends Document {
 	}
 
 	public static void main(String[] args) {
-		int max = 1;
+		int max = 100;
 		try {
+			Document.register(LivrC3.class);
+			
 			String type = "LivrC";
 			String line = "P.1.";
 			String column = "408.10.";
 			String text = LivrC2.readFile(column, type);
 			LivrC2 c = new Gson().fromJson(text, LivrC2.class);
-			LivrC3 d = (LivrC3)Document.newDocument("LivrC3", line + "@" + column + "_" + type);
+			LivrC3 d = (LivrC3)Document.newDocument(LivrC3.class, line + "@" + column + "_" + type);
 			
 			d.recomp = c.Recomp.recomp;
 			if (c.ExclC.prods != null && c.ExclC.prods.size() != 0) {
@@ -187,7 +184,7 @@ public class LivrC3 extends Document {
 			d.gac.flags = c.Gac.flags ;
 			
 			for(LivrC2.Ac ac1 : c.Ac){
-				Ac ac = (Ac)d.getItem("Ac", "" + ac1.ac);
+				Ac ac = (Ac)d.getItem(Ac.class, "" + ac1.ac);
 				ac.ac = ac1.ac;
 				ac.poids = ac1.poids;
 				ac.prix = ac1.prix;
@@ -237,7 +234,7 @@ public class LivrC3 extends Document {
 			}
 			
 			for(LivrC2.AcApPr acApPr1 : c.AcApPr) {
-				AcApPr acApPr = (AcApPr)d.getItem("AcApPr", acApPr1.ac + "." + acApPr1.ap + "." + acApPr1.pr);
+				AcApPr acApPr = (AcApPr)d.getItem(AcApPr.class, acApPr1.ac + "." + acApPr1.ap + "." + acApPr1.pr);
 				acApPr.ac = acApPr1.ac;
 				acApPr.ap = acApPr1.ap;
 				acApPr.pr = acApPr1.pr;
@@ -256,7 +253,7 @@ public class LivrC3 extends Document {
 			}
 
 			for(LivrC2.Prix p1 : c.Prix){
-				Prix p = (Prix)d.getItem("Prix", "" + p1.prod);
+				Prix p = (Prix)d.getItem(Prix.class, "" + p1.prod);
 				p.prod = p1.prod ;
 				p.dispo = p1.dispo ;
 				p.pu = p1.pu ;
@@ -268,7 +265,7 @@ public class LivrC3 extends Document {
 			}
 			
 			for(LivrC2.Ap ap1 : c.Ap){
-				Ap ap = (Ap)d.getItem("Ap", "" + ap1.ap);
+				Ap ap = (Ap)d.getItem(Ap.class, "" + ap1.ap);
 				ap.ap = ap1.ap;
 				ap.prixPG = ap1.prixPG;
 				ap.regltFait = ap1.regltFait;
@@ -334,31 +331,22 @@ public class LivrC3 extends Document {
 			byte[] bytes2 = null;
 			String jsonAll = "";
 			for(int i = 0; i < max; i++) {
-				jsonAll = d.serialize(0);
+				jsonAll = d.serialize(0, t3);
 				bytes = jsonAll.getBytes("UTF-8");
 				lg = bytes.length;
 			}
 			long t4 = System.currentTimeMillis();
 			System.out.println("Stringify to JSON : " + (t4 - t3) + "ms. lg json2 = " + lg);
 
-			long t5 = System.currentTimeMillis();
-			for(int i = 0; i < max; i++) {
-				ByteArrayOutputStream bos2 = new ByteArrayOutputStream();
-				GZIPOutputStream zos = new GZIPOutputStream(bos2, 128 * 1024);
-				zos.write(bytes);
-				zos.close();
-				bytes2 = bos2.toByteArray();
-			}
-			long t6 = System.currentTimeMillis();
-			System.out.println("GZIP : " + (t6 - t5) + "ms. lg gz = " + bytes2.length);
-
+			bytes2 = Document.Gzip(bytes);
+			Document.Gunzip(bytes2);
+			
 			LivrC2.writeFile(column, type, 4, bytes2);
-
 			
 			Document d2 = null;
 			long t7 = System.currentTimeMillis();
 			for(int i = 0; i < max; i++) {
-				d2 = newDocument("LivrC3", d.id(), jsonAll);
+				d2 = newDocument(jsonAll, true);
 			}
 			long t8 = System.currentTimeMillis();
 			System.out.println("Parse All : " + (t8 - t7) + "ms.");
@@ -370,27 +358,27 @@ public class LivrC3 extends Document {
 			bytes2 = null;
 			jsonAll = "";
 			for(int i = 0; i < max; i++) {
-				jsonAll = d2.serialize(0);
+				jsonAll = d2.serialize(0, t9);
 				bytes = jsonAll.getBytes("UTF-8");
 				lg = bytes.length;
 			}
 			long t10 = System.currentTimeMillis();
 			System.out.println("Re Stringify to JSON : " + (t10 - t9) + "ms. lg json2 = " + lg);
 
-			
-			
-			Ac x = (Ac)d2.getItem("Ac", "45");
+			long t11 = System.currentTimeMillis();
+			Ac x = (Ac)d2.getItem(Ac.class, "45");
 			x.poids = 9999;
 			x.save();
-			jsonAll = d2.serialize(1);
+			jsonAll = d2.serialize(1, t11);
 			System.out.println("Stringify Incr to JSON : lg json2 = " + jsonAll.length());
 			
-			for(String id : d2.getIds("AcApPr")){
+			long t12 = System.currentTimeMillis();
+			for(String id : d2.getIds(AcApPr.class)){
 				if (!id.startsWith("45.")) continue;
-				AcApPr acApPr = (AcApPr)d2.getItem("AcApPr", id);
-				Ac ac = (Ac)d2.getItem("Ac", ""+acApPr.ac);
+				AcApPr acApPr = (AcApPr)d2.getItem(AcApPr.class, id);
+				Ac ac = (Ac)d2.getItem(Ac.class, ""+acApPr.ac);
 				AcAp acAp = ac.acAp.get(""+acApPr.ap);
-				Ap ap = (Ap)d2.getItem("Ap", ""+acApPr.ap);
+				Ap ap = (Ap)d2.getItem(Ap.class, ""+acApPr.ap);
 				ApPr apPr = ap.apPr.get(""+acApPr.pr);
 				int p = acApPr.prix;
 				acApPr.prix += p;
@@ -400,9 +388,10 @@ public class LivrC3 extends Document {
 				ap.save();
 				acApPr.save();
 			}
-			jsonAll = d2.serialize(1);
+			jsonAll = d2.serialize(t11, t12);
 			System.out.println("Stringify Incr to JSON : lg json3 = " + jsonAll.length());
-
+			byte[] bx = Document.Gzip(jsonAll.getBytes("UTF-8"));
+			Document.Gunzip(bx);
 		} catch (Throwable t){
 			t.printStackTrace();
 		}

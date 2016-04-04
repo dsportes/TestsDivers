@@ -7,277 +7,421 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
 
 public class DocumentMeta {
-	public static final Logger log = Logger.getAnonymousLogger();	
+	public static final Logger log = Logger.getAnonymousLogger();
 	
-	public static void register(Class<?> documentClass, Class<?>... itemClasses){
-		String cn = documentClass.getSimpleName();
-		DocumentDescriptor dd = DocumentDescriptor.documentDescriptor(cn);
-		if (dd != null) return;
-		dd = new DocumentDescriptor();
-		dd.documentClassName = cn;
-		DocumentDescriptor.ddList.add(dd);
-		dd.documentClass = documentClass;
-		dd.innerClasses = dd.documentClass.getDeclaredClasses();
-		dd.innerClassNames = new String[dd.innerClasses.length];
-		for(int i = 0; i < dd.innerClasses.length; i++)
-			dd.innerClassNames[i] = dd.innerClasses[i].getSimpleName();
-		for(Class<?> c : itemClasses)
-			dd.itemDescriptor(c.getSimpleName());
-		Document doc;
-		try {
-			doc = (Document)dd.documentClass.newInstance();
-		} catch (InstantiationException | IllegalAccessException e) {
-			String m = "Le document de classe " + cn + " n'est pas instantiable. " + e.getMessage();
-			log.severe(m);
-			throw new IllegalArgumentException(m);
+	public static final int MAXINCRMODEINHOURS = 24;
+	
+	public enum Status {NODATA, UNCHANGED, MODIFIED, EMPTY, CREATED, DELETED}
+	
+	@SuppressWarnings("serial")
+	public static class DMException extends Exception {
+		public DMException(String msg){
+			super(msg);
+			log.severe(msg);
 		}
-		synchronized (dd.gson) {
-			dd.json = dd.gson.toJson(doc);
+		public DMException(String msg, Exception e){
+			super(msg, e);
+			log.severe(msg + " [" + e.getMessage() + "]");
+		}
+	}
+
+	static void register(Class<?>... documentClasses) throws DMException {
+		if (documentClasses == null) return;
+		for (Class<?> documentClass : documentClasses) {
+			if (documentClass == null) return;
+			String cn = documentClass.getSimpleName();
+			if (!Document.class.isAssignableFrom(documentClass)) {
+				throw new DMException("Le Document " + cn + "] doit étendre " + Document.class.getCanonicalName());
+			}
+			for(DocumentDescriptor dx : DocumentDescriptor.ddList)
+				if (dx.documentClass == documentClass) continue;
+			DocumentDescriptor dd = new DocumentDescriptor();
+			dd.documentClassName = cn;
+			dd.documentClass = documentClass;
+			dd.json = dd.toJson(dd.newDocument(), new StringBuffer()).toString();
+			DocumentDescriptor.ddList.add(dd);
+	
+			Class<?>[] innerClasses = dd.documentClass.getDeclaredClasses();
+			for(int i = 0; i < innerClasses.length; i++) {
+				Class<?> c = innerClasses[i];
+				if (Document.Item.class.isAssignableFrom(c)) {
+					DocumentDescriptor.ItemDescriptor id = dd.new ItemDescriptor();
+					id.index = dd.idList.size();
+					id.itemClass = c;
+					id.itemClassName = c.getSimpleName();
+					id.json = id.toJson(id.newItem(), new StringBuffer()).toString();
+					dd.idList.add(id);
+				}
+			}
 		}
 	}
 	
 	@SuppressWarnings("serial")
 	private static class ItemMap extends HashMap<String,ItemMeta> {}
 	
+	public static Class<?> forName(String name) throws DMException {
+		return DocumentDescriptor.documentDescriptor(name).documentClass;
+	}
+
+	private static Gson gson = new Gson();
+	
+	private static String unescape(String s){
+		try {
+			synchronized (gson) {
+				return (String)gson.fromJson("\"" + s + "\"", String.class);
+			}
+		} catch (Exception e) { 
+			return s;
+		}
+		
+	}
+
+	private static String escape(String s) {
+		synchronized (gson) {
+			String x = gson.toJson(s);
+			return x.length() < 2 ? "" : x.substring(1, x.length() - 1);
+		}
+	}
+
+	private static DocumentMeta newMeta(String json) throws DMException {
+		try {
+			synchronized (gson) {
+				return (DocumentMeta)gson.fromJson(json, DocumentMeta.class);
+			}
+		} catch (Exception e) { 
+			throw new DMException("Erreur de syntaxe JSON - Document: _Meta [" + e.getMessage() + "]", e);
+		}
+	}
+	
 	private static class DocumentDescriptor {
 		private static ArrayList<DocumentDescriptor> ddList = new ArrayList<DocumentDescriptor>();
 		
-		private static DocumentDescriptor documentDescriptor(String className){
+		private static DocumentDescriptor documentDescriptor(Class<?> clazz) throws DMException{
+			for(DocumentDescriptor dd : ddList)
+				if (dd.documentClass == clazz) return dd;
+			throw new DMException("La classe " + clazz.getCanonicalName() + " n'est pas enregistrée comme Document");
+		}
+
+		static DocumentDescriptor documentDescriptor(String className) throws DMException{
 			for(DocumentDescriptor dd : ddList)
 				if (dd.documentClassName.equals(className)) return dd;
-			return null;
+			throw new DMException("La classe " + className + " n'est pas enregistrée comme Document");
 		}
-		
+
 		private class ItemDescriptor {
 			private String itemClassName;
 			private Class<?> itemClass;
 			private int index;
+			private String json;
+			
+			private boolean isEmpty(String json){
+				return this.json.equals(json);
+			}
+			
+			private Document.Item newItem() throws DMException {
+				try { 
+					return (Document.Item)itemClass.newInstance(); 
+				} catch (Exception e) { 
+					throw new DMException("Instantiation impossible - Document/Item:" 
+							+ documentClassName + "/" + itemClassName + "[" + e.getMessage() + "]", e);
+				}
+			}
+
+			private Document.Item newItem(String json) throws DMException {
+				try {
+					synchronized (gson) {
+						return (Document.Item)gson.fromJson(json, itemClass);
+					}
+				} catch (Exception e) { 
+					throw new DMException("Erreur de syntaxe JSON - Document/Item:" 
+							+ documentClassName + "/" + itemClassName  + "[" + e.getMessage() + "]", e);
+				}
+			}
+
+			private StringBuffer toJson(Document.Item item, StringBuffer sb){
+				synchronized (gson) {
+					return sb.append(gson.toJson(item));
+				}
+			}
+
 		}
 		
-		private ItemDescriptor itemDescriptor(String className){
-			for(ItemDescriptor id : idList)
-				if (id.itemClassName.equals(className)) return id;
-			ItemDescriptor id = new ItemDescriptor();
-			id.itemClassName = className;
-			for(int i = 0; i < innerClasses.length; i++)
-				if (innerClassNames[i].equals(className))
-					id.itemClass = innerClasses[i];
-			if (id.itemClass == null)
-				return null;
-			id.index = idList.size();
-			idList.add(id);
-			return id;
+		private ItemDescriptor itemDescriptor(String className) {
+			for(ItemDescriptor itd : idList){
+				if (itd.itemClassName.equals(className))
+					return itd;
+			}
+			return null;
 		}
 
+		private ItemDescriptor itemDescriptor(Class<?> clazz) {
+			for(ItemDescriptor itd : idList){
+				if (itd.itemClass == (clazz))
+					return itd;
+			}
+			return null;
+		}
+
+		private Document newDocument() throws DMException {
+			try { 
+				return (Document)documentClass.newInstance(); 
+			} catch (Exception e) { 
+				throw new DMException("Instantiation impossible - Document:" 
+						+ documentClassName + "[" + e.getMessage() + "]", e);
+			}
+		}
+
+		private Document newDocument(String json) throws DMException {
+			try {
+				synchronized (gson) {
+					return (Document)gson.fromJson(json, documentClass);
+				}
+			} catch (Exception e) { 
+				throw new DMException("Erreur de syntaxe JSON - Document:" 
+						+ documentClassName + "[" + e.getMessage() + "]", e);
+			}
+		}
+
+		private StringBuffer toJson(DocumentMeta meta, StringBuffer sb){
+			synchronized (gson) {
+				return sb.append(gson.toJson(meta));
+			}
+		}
+
+		private StringBuffer toJson(Document document, StringBuffer sb){
+			synchronized (gson) {
+				return sb.append(gson.toJson(document));
+			}
+		}
+		
 		private String documentClassName;
 		private Class<?> documentClass;
-		private Class<?>[] innerClasses;
-		private String[] innerClassNames;
 		private ArrayList<ItemDescriptor> idList = new ArrayList<ItemDescriptor>();
 		private Gson gson = new Gson();
 		private String json;
 		
 	}
-	static Document newDocument(String className, String id) throws Exception {
-		return newDocument(className, id, null);
-	}
-	static Document newDocument(String className, String id, String jsonAll) throws Exception {
-		DocumentDescriptor dd = DocumentDescriptor.documentDescriptor(className);
-		if (dd == null) return null;
+
+	static Document newDocument(Class<?> clazz, String id) throws DMException {
+		if (clazz == null || id == null || id.length() == 0)
+			throw new DMException("newDocument(), paramètres class ou id absents ou vides");
+		DocumentDescriptor dd = DocumentDescriptor.documentDescriptor(clazz);
 		DocumentMeta meta = new DocumentMeta();
-		if (jsonAll == null || jsonAll.length() == 0) {
-			try { meta.document = (Document)dd.documentClass.newInstance(); } catch (Exception e) {}
-			meta.document._meta = meta;
-			meta._documentDescriptor = dd;
-			meta._id = id;
-			meta._documentVersion = 0;
-			meta._items = new ItemMap[dd.idList.size()];
-			return meta.document;
-		}
-		int s = jsonAll.indexOf('\n');
-		int vv = Integer.parseInt(jsonAll.substring(1, s));
-		s = s + 2;
-		int i = jsonAll.indexOf('\n', s);
-		if ("null".equals(jsonAll.substring(s, i))) {
-			try { meta.document = (Document)dd.documentClass.newInstance(); } catch (Exception e) {}
-			meta.document._meta = meta;
-			meta._documentVersion = vv;
-			meta._json = dd.json;
-			meta._documentDescriptor = dd;
-			meta._id = id;
-			meta._items = new ItemMap[dd.idList.size()];
-			meta._version = -1;
-		} else {
-			int vx = jsonAll.lastIndexOf(',', i);
-			String x = jsonAll.substring(s, vx) + "}";
-			synchronized (dd.gson) {
-				meta.document = (Document)dd.gson.fromJson(x, dd.documentClass);
-			}
-			meta.document._meta = meta;
-			meta._documentVersion = vv;
-			meta._version = Integer.parseInt(jsonAll.substring(vx + 6, i - 1));
-			meta._json = x;
-		}
+		meta.documentDescriptor = dd;
+		meta.items = new ItemMap[dd.idList.size()];
+		meta.document = dd.newDocument();
+		meta.document._meta = meta;
+		meta._class = dd.documentClassName;
 		meta._id = id;
-		meta._documentDescriptor = dd;
-		meta._items = new ItemMap[dd.idList.size()];
-		i = i + 4;
+		meta._v = 0;
+		return meta.document;
+	}
+
+	static Document newDocument(String jsonAll, boolean full) throws DMException {
+		if (jsonAll == null || jsonAll.length() == 0) 
+			throw new DMException("newDocument(), paramètre jsonAll absent ou vide");
+		
+		DocumentMeta meta = null;
+		DocumentDescriptor dd = null;
+		boolean hasDocument = false;
+		long now = System.currentTimeMillis();
+		
+		int i = 2;
 		while (true){
 			int j = jsonAll.indexOf('\n', i);
 			if (j == -1) break;
 			int k = jsonAll.indexOf('\"', i);
 			String key = jsonAll.substring(i, k);
-			int sv = key.indexOf('@');
-			int si = key.indexOf('@', sv + 1);
-			String cn = key.substring(0, sv);
-			String idx = dd.gson.fromJson("\"" + key.substring(si + 1) + "\"", String.class);
-			int v = Integer.parseInt(key.substring(sv + 1, si));
-			meta.createItemMeta(cn, idx, v, jsonAll.substring(k + 2, j - 1) );
-			i = j + 4;
+			int a = key.indexOf('@');
+			String type = a == -1 ? key : key.substring(0, a);
+			String idx = a == -1 || a == key.length() - 1 ? null : unescape(key.substring(a + 1));
+			
+			if ("_Meta".equals(type)) {
+				DocumentMeta _meta = newMeta(jsonAll.substring(k + 2, j));
+				dd = DocumentDescriptor.documentDescriptor(_meta._class);
+				meta = new DocumentMeta();
+				meta.documentDescriptor = dd;
+				meta.items = new ItemMap[dd.idList.size()];
+				meta._id = _meta._id;
+				meta._v = _meta._v;
+				meta._stamp = _meta._stamp;
+				meta._class = dd.documentClassName;
+			} else {
+				if (meta == null)
+					throw new DMException("newDocument() : json ne contient pas "
+							+ "d'identification \"_Meta\":{...} en tête");
+				int virg = jsonAll.lastIndexOf(',', j);
+				long v = Long.parseLong(jsonAll.substring(virg + 6, j - 1));
+				String json = jsonAll.substring(k + 2, virg) + "}";
+				if (dd.documentClassName.equals(type)) {
+					hasDocument = true;
+					meta.document = dd.newDocument(json);
+					meta.document._meta = meta;
+					meta.version = v;
+					meta.json = json;
+				} else {
+					if (idx == null) continue;
+					if (v < 0 && now + v > MAXINCRMODEINHOURS * 3600000)
+						continue;
+					ItemMeta itemMeta = new ItemMeta();
+					itemMeta.itemDescriptor = dd.itemDescriptor(type);
+					if (itemMeta.itemDescriptor == null) continue;
+					itemMeta.item = null;
+					itemMeta.document = meta;
+					itemMeta.status = v >= 0 ? Status.EMPTY : Status.DELETED;
+					itemMeta.version = v;
+					itemMeta.json = json;
+					itemMeta.item = full ? itemMeta.itemDescriptor.newItem(itemMeta.json) : null;
+					itemMeta.id = idx;
+					int ix = itemMeta.itemDescriptor.index;
+					ItemMap im = itemMeta.document.items[ix];
+					if (im == null) {
+						itemMeta.document.items[ix] = new ItemMap();
+						im = itemMeta.document.items[ix];
+					}
+					im.put(itemMeta.id, itemMeta);
+				}
+			}
+			i = j + 3;
+		}
+		
+		if (!hasDocument) {
+			meta.document = dd.newDocument();
+			meta.document._meta = meta;
+			meta.json = dd.json;
 		}
 		return meta.document;
 	}
 
-	private void createItemMeta(String className, String id, int version, String json) throws Exception {
-		if (id == null || id.length() == 0) return;
-		DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.itemDescriptor(className);
-		if (itd == null) return;
-		ItemMeta itemMeta = new ItemMeta();
-		itemMeta._document = this;
-		itemMeta._itemDescriptor = itd;
-		itemMeta._status = 0;
-		itemMeta._version = version;
-		itemMeta._json = json;
-		itemMeta._id = id;
-		int i = itemMeta._itemDescriptor.index;
-		ItemMap im = itemMeta._document._items[i];
-		if (im == null) {
-			itemMeta._document._items[i] = new ItemMap();
-			im = itemMeta._document._items[i];
-		}
-		im.put(itemMeta._id, itemMeta);
-	}
+	private String _class;
+	private String _id;
+	private long _v;
+	private long _stamp;
 
-	private transient DocumentDescriptor _documentDescriptor;
-	private transient String _id;
-	private transient int _documentVersion;
-	private transient int _version;
-	private transient String _json;
-	private transient String _json2;
-	private transient ItemMap[] _items;
-	private transient boolean _hasChanged = false;
-	private Document document;
-		
-	int version() { return _documentVersion; }
+	private transient DocumentDescriptor documentDescriptor;
+	private transient long version;
+	private transient String jsonAll;
+	private transient String json;
+	private transient String json2;
+	private transient ItemMap[] items;
+	private transient boolean hasChanged = false;
+	private transient Document document;
+
+	long stamp() { return _stamp; }
+	long version() { return _v; }
 	String id() { return _id; }
-	boolean hasChanged(){ return _hasChanged; }
+	boolean hasChanged(){ return hasChanged; }
 	
-	Set<String> getIds(String className) {
-		DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.itemDescriptor(className);
+	Set<String> getIds(Class<?> clazz) {
+		DocumentDescriptor.ItemDescriptor itd = documentDescriptor.itemDescriptor(clazz);
 		if (itd != null) {
-			ItemMap im = _items[itd.index];
+			ItemMap im = items[itd.index];
 			if (im != null) 
 				return im.keySet();
 		}
 		return new HashSet<String>();
 	}
 	
-	Document.Item getItem(String className, String id) throws Exception {
+	Document.Item getItem(Class<?> clazz, String id) throws Exception {
 		if (id == null || id.length() == 0) return null;
-		DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.itemDescriptor(className);
+		DocumentDescriptor.ItemDescriptor itd = documentDescriptor.itemDescriptor(clazz);
 		if (itd == null) return null;
-		ItemMap im = _items[itd.index];
+		ItemMap im = items[itd.index];
 		if (im == null){
 			im = new ItemMap();
-			_items[itd.index] = im;
+			items[itd.index] = im;
 		}
 		ItemMeta itemMeta = im.get(id);
 		Document.Item item = null;
 		if (itemMeta == null){
 			itemMeta = new ItemMeta();
-			itemMeta._document = this;
-			itemMeta._itemDescriptor = itd;
-			itemMeta._id = id;
+			itemMeta.document = this;
+			itemMeta.itemDescriptor = itd;
+			itemMeta.id = id;
 			im.put(id, itemMeta);
-		}
-		if (itemMeta._json == null) {
-			item = (Document.Item) itd.itemClass.newInstance();
-			itemMeta._status = 2;
+		} else if (itemMeta.status == Status.DELETED)
+			return null;
+		if (itemMeta.json == null) {
+			item = itd.newItem();
+			itemMeta.status = Status.EMPTY;
 		} else {
-			synchronized (_documentDescriptor.gson) {
-				try {
-					item = (Document.Item)_documentDescriptor.gson.fromJson(itemMeta._json, itd.itemClass);
-				} catch (JsonSyntaxException e){
-					throw new Exception("Syntaxe JSON - Document/Item:" 
-							+ _documentDescriptor.documentClassName + "/" + className, e);
-				}
-			}
-			itemMeta._status = 1;
+			item = itd.newItem(itemMeta.json);
+			itemMeta.status = Status.UNCHANGED;
 		}
 		item._meta = itemMeta;
 		itemMeta.item = item;
 		return item;
 	}
 		
-	String serialize(int vmin){
+	String serialize(long vmin, long stamp){
 		StringBuffer sb = new StringBuffer();
-		synchronized (_documentDescriptor.gson) {
-			_json2 = _documentDescriptor.gson.toJson(document);
-		}
-		_hasChanged = !_json2.equals(_json);
-		if (_hasChanged)
-			_version = _documentVersion + 1;
-		if (vmin >= _version) {
-			sb.append("null\n");
-		} else {
-			sb.append(_json2);
+		sb.append("\"").append(documentDescriptor.documentClassName).append("\":");
+		json2 = documentDescriptor.toJson(document, sb).toString();
+		hasChanged = !json2.equals(json);
+		if (hasChanged)
+			version = stamp;
+		if (vmin < version) {
 			sb.setLength(sb.length() - 1);
-			sb.append(",\"_v\"=").append(_version).append("}\n");
-		}
-		for(int i = 0; i < _documentDescriptor.idList.size(); i++){
-			DocumentDescriptor.ItemDescriptor itd = _documentDescriptor.idList.get(i);
-			ItemMap im = _items[i];
+			sb.append(",\"_v\":").append(version).append("}\n");
+		} else 
+			sb.setLength(0);
+		
+		for(int i = 0; i < documentDescriptor.idList.size(); i++){
+			DocumentDescriptor.ItemDescriptor itd = documentDescriptor.idList.get(i);
+			ItemMap im = items[i];
 			if (im != null && im.size() != 0) {
 				for(String id : im.keySet()){
 					ItemMeta itemMeta = im.get(id);
-					if (itemMeta._status == 2) continue; // créé pas sauvé
-					boolean mod = itemMeta.modified();
+					boolean mod = itemMeta.status == Status.CREATED || itemMeta.status == Status.MODIFIED;
 					if (mod) {
-						itemMeta._version = _documentVersion + 1;
-						_hasChanged = true;
+						itemMeta.version = stamp;
+						hasChanged = true;
 					}
-					if (vmin >= itemMeta._version) continue;
-					String name = _documentDescriptor.gson.toJson(itd.itemClassName + "@" + itemMeta._version + "@" + itemMeta._id);
-					sb.append(",{").append(name).append("=").append(mod ? itemMeta._json2 : itemMeta._json).append("}\n");
+					if (vmin < itemMeta.version) {
+						sb.append(",\"")
+						.append(itd.itemClassName + "@" + escape(itemMeta.id))
+						.append("\":");
+						if (itemMeta.status == Status.DELETED)
+							sb.append("{\"_v\":").append(-itemMeta.version);
+						else {
+							sb.append(mod ? itemMeta.json2 : itemMeta.json);
+							sb.setLength(sb.length() - 1);
+							sb.append(",\"_v\":").append(itemMeta.version);
+						}
+						sb.append("}\n");
+					}
 				}
 			}
 		}
-		sb.append("]");
-		int vv = _hasChanged ? _documentVersion + 1 : _documentVersion;
-		sb.insert(0, "[" + vv + "\n,");
+		sb.append("}");
+		if (hasChanged)
+			_v = stamp;
+		_stamp = stamp;
+		StringBuffer sb2 = new StringBuffer();
+		sb2.append("{\"_Meta\":");
+		documentDescriptor.toJson(this, sb2);
+		sb2.append("\n,");
+		sb.insert(0, sb2.toString());
 		return sb.toString();
 	}
 	
 	void commit(){
-		if (_hasChanged)
-			_documentVersion++;
-		if (_version == _documentVersion)
-			_json = _json2;
-		_json2 = null;
+		if (version == _v)
+			json = json2;
+		json2 = null;
 		document = null;
-		for(int i = 0; i < _documentDescriptor.idList.size(); i++){
-			ItemMap im = _items[i];
+		for(int i = 0; i < documentDescriptor.idList.size(); i++){
+			ItemMap im = items[i];
 			if (im == null || im.size() == 0){
-				_items[i] = null;
+				items[i] = null;
 			} else {
 				for(String id : im.keySet()){
 					ItemMeta itemMeta = im.get(id);
-					if (itemMeta._version == _documentVersion)
-						itemMeta._json = itemMeta._json2;
-					itemMeta._json2 = null;
+					if (itemMeta.version == _v)
+						itemMeta.json = itemMeta.json2;
+					itemMeta.json2 = null;
 					itemMeta.item = null;;
 				}
 			}
@@ -286,26 +430,29 @@ public class DocumentMeta {
 	
 	DocumentMeta duplicate(){
 		DocumentMeta c = new DocumentMeta();
-		c._documentDescriptor = _documentDescriptor;
+		c.documentDescriptor = documentDescriptor;
 		c._id = _id;
-		c._documentVersion = _documentVersion;
-		c._version = _version;
-		c._json = _json;
-		c._items = new ItemMap[_documentDescriptor.idList.size()];
-		for(int i = 0; i < _documentDescriptor.idList.size(); i++){
-			ItemMap im = _items[i];
+		c._v = _v;
+		c._class = _class;
+		c.jsonAll = jsonAll;
+		c.version = version;
+		c.json = json;
+		c.items = new ItemMap[documentDescriptor.idList.size()];
+		for(int i = 0; i < documentDescriptor.idList.size(); i++){
+			ItemMap im = items[i];
 			if (im != null && im.size() == 0){
 				ItemMap cim = new ItemMap();
-				c._items[i] = cim;
+				c.items[i] = cim;
 				for(String id : im.keySet()){
 					ItemMeta m = im.get(id);
 					ItemMeta x = new ItemMeta();
-					cim.put(m._id, x);
-					x._document = m._document;
-					x._itemDescriptor = m._itemDescriptor;
-					x._json = m._json;
-					x._id = m._id;
-					x._version = m._version;
+					cim.put(m.id, x);
+					x.document = m.document;
+					x.itemDescriptor = m.itemDescriptor;
+					x.json = m.json;
+					x.status = m.status == Status.DELETED ? Status.DELETED : Status.NODATA;
+					x.id = m.id;
+					x.version = m.version;
 				}
 			}
 		}
@@ -313,38 +460,53 @@ public class DocumentMeta {
 	}
 	
 	public static class ItemMeta {
-		private transient DocumentMeta _document;
-		private transient DocumentDescriptor.ItemDescriptor _itemDescriptor;
-		private transient String _json;
-		private transient String _json2;
-		private transient int _status; // 0:nodata, 1:data, 2:new, 3:tosave
-		private transient String _id;
-		private transient int _version;
+		private DocumentMeta document;
+		private DocumentDescriptor.ItemDescriptor itemDescriptor;
+		private String json;
+		private String json2;
+		private Status status;
+		private String id;
+		private long version;
 		private Document.Item item;
+				
+		Status status() { return status; }
+		long version() { return version; }
+		String id() { return id; }
+				
+		void delete(){
+			status = Status.DELETED;
+			json2 = null;
+		}
 		
-		int version() { return _version; }
-		String id() { return _id; }
-		
-		boolean modified() {
-			if (_status != 3) return false;
-			if (_json2 == null){
-				synchronized (_document._documentDescriptor.gson) {
-					_json2 = _document._documentDescriptor.gson.toJson(item);
-				}
-				if (_json2.equals(_json)) {
-					_json2 = null;
-					_status = 1;
+		boolean save(){
+			switch (status) {
+			case DELETED : 
+			case NODATA : return false;
+			case MODIFIED :
+			case UNCHANGED : {
+				json2 = itemDescriptor.toJson(item, new StringBuffer()).toString();
+				if (json2.equals(json)) {
+					json2 = null;
+					status = Status.UNCHANGED;
 					return false;
-				} else
-					return true;
-			} else
+				}
+				status = Status.MODIFIED;
 				return true;
+			}
+			case CREATED :
+			case EMPTY : {
+				json2 = itemDescriptor.toJson(item, new StringBuffer()).toString();
+				if (itemDescriptor.isEmpty(json2)) {
+					json2 = null;
+					status = Status.EMPTY;
+					return false;
+				}
+				status = Status.CREATED;
+				return true;
+			}
+			}
+			return false;
 		}
-		
-		void save(){
-			_status = 3;
-		}
-		
 	}
 	
 }
