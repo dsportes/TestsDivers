@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 public class LivrC3 extends Document {
 	
@@ -146,7 +147,7 @@ public class LivrC3 extends Document {
 	}
 
 	public static void main(String[] args) {
-		int max = 100;
+		int max = 1;
 		try {
 			Document.register(LivrC3.class);
 			
@@ -331,18 +332,22 @@ public class LivrC3 extends Document {
 			byte[] bytes2 = null;
 			String jsonAll = "";
 			for(int i = 0; i < max; i++) {
-				jsonAll = d.serialize(0, t3);
+				jsonAll = d.serializeForDB(t3, true);
 				bytes = jsonAll.getBytes("UTF-8");
 				lg = bytes.length;
 			}
 			long t4 = System.currentTimeMillis();
 			System.out.println("Stringify to JSON : " + (t4 - t3) + "ms. lg json2 = " + lg);
-
+						
 			bytes2 = Document.Gzip(bytes);
 			Document.Gunzip(bytes2);
 			
 			LivrC2.writeFile(column, type, 4, bytes2);
 			
+			Gson gson = new Gson();
+			// JsonObject obj = gson.fromJson(jsonAll, JsonObject.class);
+			System.out.println("_Meta : " + gson.toJson(gson.fromJson(jsonAll, JsonObject.class).get("_Meta")));
+
 			Document d2 = null;
 			long t7 = System.currentTimeMillis();
 			for(int i = 0; i < max; i++) {
@@ -358,19 +363,21 @@ public class LivrC3 extends Document {
 			bytes2 = null;
 			jsonAll = "";
 			for(int i = 0; i < max; i++) {
-				jsonAll = d2.serialize(0, t9);
+				jsonAll = d2.serializeForSync(0);
 				bytes = jsonAll.getBytes("UTF-8");
 				lg = bytes.length;
 			}
 			long t10 = System.currentTimeMillis();
-			System.out.println("Re Stringify to JSON : " + (t10 - t9) + "ms. lg json2 = " + lg);
+			System.out.println("Stringify to JSON - for sync, full : " + (t10 - t9) + "ms. lg json2 = " + lg);
+			System.out.println("_Meta : " + gson.toJson(gson.fromJson(jsonAll, JsonObject.class).get("_Meta")));
 
 			long t11 = System.currentTimeMillis();
 			Ac x = (Ac)d2.getItem(Ac.class, "45");
 			x.poids = 9999;
 			x.save();
-			jsonAll = d2.serialize(1, t11);
-			System.out.println("Stringify Incr to JSON : lg json2 = " + jsonAll.length());
+			jsonAll = d2.serializeForDB(t11, false);
+			System.out.println("Stringify to JSON - for DB, incr : lg json2 = " + jsonAll.length());
+			System.out.println("_Meta : " + gson.toJson(gson.fromJson(jsonAll, JsonObject.class).get("_Meta")));
 			
 			long t12 = System.currentTimeMillis();
 			for(String id : d2.getIds(AcApPr.class)){
@@ -388,8 +395,11 @@ public class LivrC3 extends Document {
 				ap.save();
 				acApPr.save();
 			}
-			jsonAll = d2.serialize(t11, t12);
-			System.out.println("Stringify Incr to JSON : lg json3 = " + jsonAll.length());
+			jsonAll = d2.serializeForDB(t12, false);
+			System.out.println("Stringify to JSON - for DB, incr : lg json3 = " + jsonAll.length());
+			jsonAll = d2.serializeForDB(t12, true);
+			System.out.println("Stringify to JSON - for DB, full : lg json3 = " + jsonAll.length());
+			System.out.println("_Meta : " + gson.toJson(gson.fromJson(jsonAll, JsonObject.class).get("_Meta")));
 			byte[] bx = Document.Gzip(jsonAll.getBytes("UTF-8"));
 			Document.Gunzip(bx);
 		} catch (Throwable t){

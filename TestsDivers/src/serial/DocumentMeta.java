@@ -184,12 +184,6 @@ public class DocumentMeta {
 			}
 		}
 
-		private StringBuffer toJson(DocumentMeta meta, StringBuffer sb){
-			synchronized (gson) {
-				return sb.append(gson.toJson(meta));
-			}
-		}
-
 		private StringBuffer toJson(Document document, StringBuffer sb){
 			synchronized (gson) {
 				return sb.append(gson.toJson(document));
@@ -233,10 +227,10 @@ public class DocumentMeta {
 			int j = jsonAll.indexOf('\n', i);
 			if (j == -1) break;
 			int k = jsonAll.indexOf('\"', i);
-			String key = jsonAll.substring(i, k);
+			String key = unescape(jsonAll.substring(i, k));
 			int a = key.indexOf('@');
 			String type = a == -1 ? key : key.substring(0, a);
-			String idx = a == -1 || a == key.length() - 1 ? null : unescape(key.substring(a + 1));
+			String idx = a == -1 || a == key.length() - 1 ? null : key.substring(a + 1);
 			
 			if ("_Meta".equals(type)) {
 				DocumentMeta _meta = newMeta(jsonAll.substring(k + 2, j));
@@ -299,6 +293,9 @@ public class DocumentMeta {
 	private String _id;
 	private long _v;
 	private long _stamp;
+	private int _n;
+	private int _sz0;
+	private int _sz9;
 
 	private transient DocumentDescriptor documentDescriptor;
 	private transient long version;
@@ -354,55 +351,95 @@ public class DocumentMeta {
 		itemMeta.item = item;
 		return item;
 	}
-		
-	String serialize(long vmin, long stamp){
+
+	/*
+	 * trStamp : stamp de la transaction et nouvelle version du document s'il a changé
+	 * full : force une sérialisation complète
+	 */
+	String serializeForDB(long trStamp, boolean full){
+		return serialize(full || _sz0 == 0 ? 0 : _v, trStamp, true);
+	}
+	
+	/*
+	 * _stamp : stamp de la dernière vérification de non évolution (ou d'évolution)
+	 * vmin : stamp de la dernière synchronisation
+	 */
+	String serializeForSync(long vmin){
+		return serialize(vmin, _stamp, false);
+	}
+	/*
+	 * 
+	 */
+	private String serialize(long vmin, long trStamp, boolean forDB){
+		hasChanged = false;
 		StringBuffer sb = new StringBuffer();
-		sb.append("\"").append(documentDescriptor.documentClassName).append("\":");
-		json2 = documentDescriptor.toJson(document, sb).toString();
-		hasChanged = !json2.equals(json);
-		if (hasChanged)
-			version = stamp;
-		if (vmin < version) {
+		if (forDB) {
+			String json2 = documentDescriptor.toJson(document, new StringBuffer()).toString();
+			hasChanged = !json2.equals(json);
+			if (hasChanged) {
+				version = trStamp;
+				json = json2;
+			}
+		}
+		if (forDB || vmin < version) {
+			sb.append("\"").append(documentDescriptor.documentClassName).append("\":").append(json);
 			sb.setLength(sb.length() - 1);
 			sb.append(",\"_v\":").append(version).append("}\n");
-		} else 
-			sb.setLength(0);
-		
-		for(int i = 0; i < documentDescriptor.idList.size(); i++){
-			DocumentDescriptor.ItemDescriptor itd = documentDescriptor.idList.get(i);
-			ItemMap im = items[i];
-			if (im != null && im.size() != 0) {
-				for(String id : im.keySet()){
-					ItemMeta itemMeta = im.get(id);
-					boolean mod = itemMeta.status == Status.CREATED || itemMeta.status == Status.MODIFIED;
-					if (mod) {
-						itemMeta.version = stamp;
-						hasChanged = true;
-					}
-					if (vmin < itemMeta.version) {
-						sb.append(",\"")
-						.append(itd.itemClassName + "@" + escape(itemMeta.id))
-						.append("\":");
-						if (itemMeta.status == Status.DELETED)
-							sb.append("{\"_v\":").append(-itemMeta.version);
-						else {
-							sb.append(mod ? itemMeta.json2 : itemMeta.json);
-							sb.setLength(sb.length() - 1);
-							sb.append(",\"_v\":").append(itemMeta.version);
+		}
+		boolean singleTurn = vmin == 0 || !forDB ;
+		boolean turn0 = true;
+		while (true) {
+			for(int i = 0; i < documentDescriptor.idList.size(); i++){
+				DocumentDescriptor.ItemDescriptor itd = documentDescriptor.idList.get(i);
+				ItemMap im = items[i];
+				if (im != null && im.size() != 0) {
+					for(String id : im.keySet()){
+						ItemMeta itemMeta = im.get(id);
+						boolean mod = forDB && (itemMeta.status == Status.CREATED || itemMeta.status == Status.MODIFIED);
+						if (mod) {
+							itemMeta.version = trStamp;
+							hasChanged = true;
 						}
-						sb.append("}\n");
+						if (singleTurn || (turn0 && vmin < itemMeta.version)) {
+							sb.append(",\"")
+							.append(escape(itd.itemClassName + "@" + itemMeta.id))
+							.append("\":");
+							if (itemMeta.status == Status.DELETED)
+								sb.append("{\"_v\":").append(-itemMeta.version);
+							else {
+								sb.append(mod ? itemMeta.json2 : itemMeta.json);
+								sb.setLength(sb.length() - 1);
+								sb.append(",\"_v\":").append(itemMeta.version);
+							}
+							sb.append("}\n");
+						}
 					}
 				}
 			}
+			if (singleTurn || !turn0 || (_sz9 + sb.length() < _sz0)) break;
+			turn0 = false;
 		}
 		sb.append("}");
 		if (hasChanged)
-			_v = stamp;
-		_stamp = stamp;
+			_v = trStamp;
 		StringBuffer sb2 = new StringBuffer();
-		sb2.append("{\"_Meta\":");
-		documentDescriptor.toJson(this, sb2);
-		sb2.append("\n,");
+		sb2.append("{\"_Meta\":{");
+		sb2.append("\"_class\":\"").append(_class)
+		.append("\",\"_id\":\"").append(escape(_id))
+		.append("\",\"_v\":").append(_v);
+		if (forDB) {
+			if (turn0) {
+				_n = 0;
+				_sz0 = sb.length();
+				_sz9 = 0;
+			} else {
+				_n++;
+				_sz9 += sb.length();
+			}
+			sb2.append(",\"_n\":").append(_n).append(",\"_sz0\":").append(_sz0).append(",\"_sz9\":").append(_sz9);
+		} else
+			sb2.append(",\"_stamp\":").append(_stamp);
+		sb2.append("}\n,");
 		sb.insert(0, sb2.toString());
 		return sb.toString();
 	}

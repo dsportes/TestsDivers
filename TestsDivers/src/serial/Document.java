@@ -31,9 +31,23 @@ public abstract class Document {
 	public Set<String> getIds(Class<?> clazz) {
 		return _meta.getIds(clazz);
 	}
-	public String serialize(long vmin, long stamp){
-		return _meta.serialize(vmin, stamp);
+
+	/*
+	 * trStamp : stamp de la transaction et nouvelle version du document s'il a changé
+	 * full : force une sérialisation complète
+	 */
+	String serializeForDB(long trStamp, boolean full){
+		return _meta.serializeForDB(trStamp, full);
 	}
+	
+	/*
+	 * _stamp : stamp de la dernière vérification de non évolution (ou d'évolution)
+	 * vmin : stamp de la dernière synchronisation
+	 */
+	String serializeForSync(long vmin){
+		return _meta.serializeForSync(vmin);
+	}
+
 	public long version() { return _meta.version(); }
 	public long stamp() { return _meta.stamp(); }
 	public String id() { return _meta.id(); }
@@ -49,7 +63,7 @@ public abstract class Document {
 	
 	public static byte[] Gzip(byte[] bytes) {
 		try {
-			int max = 100;
+			int max = 1;
 			byte[] bytes2 = null;
 			long t5 = System.currentTimeMillis();
 			for(int i = 0; i < max; i++) {
@@ -69,7 +83,7 @@ public abstract class Document {
 
 	public static byte[] Gunzip(byte[] bytes) {
 		try {
-			int max = 100;
+			int max = 1;
 			byte[] bytes2 = null;
 			byte[] buf = new byte[4096];
 			long t5 = System.currentTimeMillis();
