@@ -1,6 +1,11 @@
 package serial;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -14,6 +19,15 @@ public class DocumentMeta {
 	public static final int MAXINCRMODEINHOURS = 24;
 	
 	public enum Status {NODATA, UNCHANGED, MODIFIED, EMPTY, CREATED, DELETED}
+	public enum FieldType {STRING, LONG, INTEGER, DOUBLE}
+	
+	private static FieldType fieldType(Class<?> c){
+		if (c == String.class) return FieldType.STRING;
+		if (c == Long.class || c == long.class) return FieldType.LONG;
+		if (c == Integer.class || c == int.class) return FieldType.INTEGER;
+		if (c == Double.class || c == double.class) return FieldType.DOUBLE;
+		return null;
+	}
 	
 	@SuppressWarnings("serial")
 	public static class DMException extends Exception {
@@ -26,7 +40,7 @@ public class DocumentMeta {
 			log.severe(msg + " [" + e.getMessage() + "]");
 		}
 	}
-
+	
 	static void register(Class<?>... documentClasses) throws DMException {
 		if (documentClasses == null) return;
 		for (Class<?> documentClass : documentClasses) {
@@ -43,6 +57,34 @@ public class DocumentMeta {
 			dd.json = dd.toJson(dd.newDocument(), new StringBuffer()).toString();
 			DocumentDescriptor.ddList.add(dd);
 	
+			for (Field field : documentClass.getDeclaredFields()) {
+				if (!Modifier.isTransient(field.getModifiers()))
+					continue;
+				String name = field.getName();
+			    Type t = field.getGenericType();
+			    Class<?> fc = null;
+			    Class<?> listClass = null;
+			    if (t instanceof ParameterizedType) {
+			        ParameterizedType pType = (ParameterizedType)t;
+			        listClass = (Class<?>)pType.getRawType();
+			        if (!Collection.class.isAssignableFrom(listClass)) continue;
+			        fc = (Class<?>) pType.getActualTypeArguments()[0];
+			    } else 
+			    	fc = (Class<?>) field.getType();
+			    FieldType ft = fieldType(fc);
+			    if (ft == null) continue;
+			    FieldDescriptor fd = dd.fieldDescriptor(name);
+			    if (fd == null){
+			    	fd = new FieldDescriptor();
+			    	dd.fdList.add(fd);
+			    }
+			    fd.type = ft;
+			    fd.field = field;
+			    fd.fieldName = name;
+			    fd.clazz = fc;
+			    fd.collectionClass = listClass;
+			}
+			
 			Class<?>[] innerClasses = dd.documentClass.getDeclaredClasses();
 			for(int i = 0; i < innerClasses.length; i++) {
 				Class<?> c = innerClasses[i];
@@ -94,8 +136,231 @@ public class DocumentMeta {
 			throw new DMException("Erreur de syntaxe JSON - Document: _Meta [" + e.getMessage() + "]", e);
 		}
 	}
-	
+		
+	public static class FieldDescriptor {
+		private FieldType type;
+		private String fieldName;
+		private Field field;
+		private Class<?> clazz;
+		private Class<?> collectionClass;
+		
+		public FieldType fieldType() { return type; }
+		
+		public boolean isCollection() { return collectionClass != null; }
+		
+		public void set(Document d, long value){
+			if (collectionClass == null && clazz == long.class)
+				try { field.set(d, value); } catch (Exception e) {	}
+		}
+		public void set(Document d, int value){
+			if (collectionClass == null && clazz == int.class)
+				try { field.set(d, value); } catch (Exception e) {	}
+		}
+		public void set(Document d, double value){
+			if (collectionClass == null && clazz == double.class)
+				try { field.set(d, value); } catch (Exception e) {	}
+		}
+		public void set(Document d, String value){
+			if (collectionClass == null && (value == null || value.getClass() == clazz))
+				try { field.set(d, value); } catch (Exception e) {	}
+		}
+
+		public long getAsLong(Document d){
+			if (collectionClass == null && clazz == long.class)
+				try { return (long)field.get(d); } catch (Exception e) { }
+			return 0L;
+		}
+		public int getAsInt(Document d){
+			if (collectionClass == null && clazz == int.class)
+				try { return (int)field.get(d); } catch (Exception e) { }
+			return 0;
+		}
+		public double getAsDouble(Document d){
+			if (collectionClass == null && clazz == double.class)
+				try { return (double)field.get(d); } catch (Exception e) { }
+			return 0;
+		}
+		public String getAsString(Document d){
+			if (collectionClass == null && clazz == String.class)
+				try { return (String)field.get(d); } catch (Exception e) { }
+			return null;
+		}
+
+		void setCL(Document d, Collection<Long> value){
+			if (collectionClass != null && clazz == Long.class) setC(d, value);
+		}
+		void setCI(Document d, Collection<Integer> value){
+			if (collectionClass != null && clazz == Integer.class) setC(d, value);
+		}
+		void setCD(Document d, Collection<Double> value){
+			if (collectionClass != null && clazz == Double.class) setC(d, value);
+		}
+		void setCS(Document d, Collection<String> value){
+			if (collectionClass != null && clazz == String.class) setC(d, value);
+		}
+
+		@SuppressWarnings("unchecked")
+		private void setC(Document d, Object val){
+			@SuppressWarnings("rawtypes")
+			Collection value = (Collection)val;
+			try {
+				Collection<Object> col = (Collection<Object>)field.get(d);
+				if (col == null){
+					col = (Collection<Object>) collectionClass.newInstance();
+					field.set(d, col);
+				} else
+					col.clear();
+				col.addAll(value);
+			} catch (Exception e) { }
+		}
+
+		@SuppressWarnings("unchecked")
+		void set(Document d, long[] value){
+			if (collectionClass != null && clazz == Long.class)
+				try {
+					Collection<Object> col = (Collection<Object>)field.get(d);
+					if (col == null){
+						col = (Collection<Object>) collectionClass.newInstance();
+						field.set(d, col);
+					} else
+						col.clear();
+					if (value != null && value.length != 0)
+						for(long obj : value)
+							col.add(obj);
+				} catch (Exception e) { }
+		}
+
+		@SuppressWarnings("unchecked")
+		void set(Document d, int[] value){
+			if (collectionClass != null && clazz == Integer.class)
+				try {
+					Collection<Object> col = (Collection<Object>)field.get(d);
+					if (col == null){
+						col = (Collection<Object>) collectionClass.newInstance();
+						field.set(d, col);
+					} else
+						col.clear();
+					if (value != null && value.length != 0)
+						for(int obj : value)
+							col.add(obj);
+				} catch (Exception e) { }
+		}
+
+		@SuppressWarnings("unchecked")
+		void set(Document d, double[] value){
+			if (collectionClass != null && clazz == Double.class)
+				try {
+					Collection<Object> col = (Collection<Object>)field.get(d);
+					if (col == null){
+						col = (Collection<Object>) collectionClass.newInstance();
+						field.set(d, col);
+					} else
+						col.clear();
+					if (value != null && value.length != 0)
+						for(double obj : value)
+							col.add(obj);
+				} catch (Exception e) { }
+		}
+
+		@SuppressWarnings("unchecked")
+		void set(Document d, String[] value){
+			if (collectionClass != null && clazz == String.class)
+				try {
+					Collection<Object> col = (Collection<Object>)field.get(d);
+					if (col == null){
+						col = (Collection<Object>) collectionClass.newInstance();
+						field.set(d, col);
+					} else
+						col.clear();
+					if (value != null && value.length != 0)
+						for(String obj : value)
+							col.add(obj);
+				} catch (Exception e) { }
+		}
+
+		@SuppressWarnings("unchecked")
+		Collection<Long> getAsCL(Document d){
+			if (collectionClass != null && clazz == Long.class)
+				try {
+					return (Collection<Long>)field.get(d);
+				} catch (Exception e) { }
+			return null;
+		}
+
+		long[] getAsAL(Document d){
+			Collection<Long> c = getAsCL(d);
+			if (c == null) return new long[0];
+			long[] r = new long[c.size()];
+			int i = 0;
+			for(Long x : c) r[i++] = x;
+			return r;
+		}
+
+		@SuppressWarnings("unchecked")
+		Collection<Integer> getAsCI(Document d){
+			if (collectionClass != null && clazz == Integer.class)
+				try {
+					return (Collection<Integer>)field.get(d);
+				} catch (Exception e) { }
+			return null;
+		}
+		
+		int[] getAsAI(Document d){
+			Collection<Integer> c = getAsCI(d);
+			if (c == null) return new int[0];
+			int[] r = new int[c.size()];
+			int i = 0;
+			for(Integer x : c) r[i++] = x;
+			return r;
+		}
+		
+		@SuppressWarnings("unchecked")
+		Collection<Double> getAsCD(Document d){
+			if (collectionClass != null && clazz == Double.class)
+				try {
+					return (Collection<Double>)field.get(d);
+				} catch (Exception e) { }
+			return null;
+		}
+
+		double[] getAsAD(Document d){
+			Collection<Double> c = getAsCD(d);
+			if (c == null) return new double[0];
+			double[] r = new double[c.size()];
+			int i = 0;
+			for(Double x : c) r[i++] = x;
+			return r;
+		}
+
+		@SuppressWarnings("unchecked")
+		Collection<String> getAsCS(Document d){
+			if (collectionClass != null && clazz == String.class)
+				try {
+					return (Collection<String>)field.get(d);
+				} catch (Exception e) { }
+			return null;
+		}
+
+		String[] getAsAS(Document d){
+			Collection<String> c = getAsCS(d);
+			if (c == null) return new String[0];
+			String[] r = new String[c.size()];
+			int i = 0;
+			for(String x : c) r[i++] = x;
+			return r;
+		}
+
+	}
+
 	private static class DocumentDescriptor {
+		
+		private String documentClassName;
+		private Class<?> documentClass;
+		private ArrayList<FieldDescriptor> fdList = new ArrayList<FieldDescriptor>();
+		private ArrayList<ItemDescriptor> idList = new ArrayList<ItemDescriptor>();
+		private Gson gson = new Gson();
+		private String json;
+		
 		private static ArrayList<DocumentDescriptor> ddList = new ArrayList<DocumentDescriptor>();
 		
 		private static DocumentDescriptor documentDescriptor(Class<?> clazz) throws DMException{
@@ -109,7 +374,7 @@ public class DocumentMeta {
 				if (dd.documentClassName.equals(className)) return dd;
 			throw new DMException("La classe " + className + " n'est pas enregistrée comme Document");
 		}
-
+		
 		private class ItemDescriptor {
 			private String itemClassName;
 			private Class<?> itemClass;
@@ -147,7 +412,15 @@ public class DocumentMeta {
 			}
 
 		}
-		
+
+		private FieldDescriptor fieldDescriptor(String fieldName) {
+			for(FieldDescriptor fd : fdList){
+				if (fd.fieldName.equals(fieldName))
+					return fd;
+			}
+			return null;
+		}
+
 		private ItemDescriptor itemDescriptor(String className) {
 			for(ItemDescriptor itd : idList){
 				if (itd.itemClassName.equals(className))
@@ -189,13 +462,6 @@ public class DocumentMeta {
 				return sb.append(gson.toJson(document));
 			}
 		}
-		
-		private String documentClassName;
-		private Class<?> documentClass;
-		private ArrayList<ItemDescriptor> idList = new ArrayList<ItemDescriptor>();
-		private Gson gson = new Gson();
-		private String json;
-		
 	}
 
 	static Document newDocument(Class<?> clazz, String id) throws DMException {
@@ -310,6 +576,10 @@ public class DocumentMeta {
 	long version() { return _v; }
 	String id() { return _id; }
 	boolean hasChanged(){ return hasChanged; }
+	
+	public FieldDescriptor fieldDescriptor(String fieldName){
+		return documentDescriptor.fieldDescriptor(fieldName);
+	}
 	
 	Set<String> getIds(Class<?> clazz) {
 		DocumentDescriptor.ItemDescriptor itd = documentDescriptor.itemDescriptor(clazz);

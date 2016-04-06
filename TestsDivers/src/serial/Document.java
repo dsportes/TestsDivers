@@ -2,14 +2,119 @@ package serial;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.Collection;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import serial.DocumentMeta.DMException;
+import serial.DocumentMeta.FieldDescriptor;
 
 public abstract class Document {
+	transient DocumentMeta _meta;
+	
+	public FieldDescriptor fieldDescriptor(String fieldName){
+		return _meta.fieldDescriptor(fieldName);
+	}
 
+	public long getAsLong(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsLong(this);
+	}
+
+	public int getAsInt(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsInt(this);
+	}
+
+	public double getAsDouble(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsDouble(this);
+	}
+
+	public String getAsString(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsString(this);
+	}
+
+	public long[] getAsAL(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsAL(this);
+	}
+
+	public int[] getAsAI(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsAI(this);
+	}
+
+	public double[] getAsAD(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsAD(this);
+	}
+
+	public String[] getAsAS(String fieldName){
+		return _meta.fieldDescriptor(fieldName).getAsAS(this);
+	}
+
+	public Collection<Long> getAsCL(String fieldName) {
+		return _meta.fieldDescriptor(fieldName).getAsCL(this);
+	}
+	
+	public Collection<Integer> getAsCI(String fieldName) {
+		return _meta.fieldDescriptor(fieldName).getAsCI(this);
+	}
+
+	public Collection<Double> getAsCD(String fieldName) {
+		return _meta.fieldDescriptor(fieldName).getAsCD(this);
+	}
+
+	public Collection<String> getAsCS(String fieldName) {
+		return _meta.fieldDescriptor(fieldName).getAsCS(this);
+	}
+
+	public void set(String fieldName, long value){
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void set(String fieldName, int value){
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void set(String fieldName, double value){
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void set(String fieldName, String value){
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+	
+	public void set(String fieldName, long[] value) {
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void set(String fieldName, int[] value) {
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void set(String fieldName, double[] value) {
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void set(String fieldName, String[] value) {
+		_meta.fieldDescriptor(fieldName).set(this, value);
+	}
+
+	public void setCL(String fieldName, Collection<Long> value) {
+		_meta.fieldDescriptor(fieldName).setCL(this, value);
+	}
+	
+	public void setCI(String fieldName, Collection<Integer> value) {
+		_meta.fieldDescriptor(fieldName).setCI(this, value);
+	}
+	
+	public void setCD(String fieldName, Collection<Double> value) {
+		_meta.fieldDescriptor(fieldName).setCD(this, value);
+	}
+
+	public void setCS(String fieldName, Collection<String> value) {
+		_meta.fieldDescriptor(fieldName).setCS(this, value);
+	}
+
+	/********************************************************************/
+	
 	public static Class<?> forName(String name) throws DMException {
 		return DocumentMeta.forName(name);
 	}
@@ -24,7 +129,6 @@ public abstract class Document {
 		return DocumentMeta.newDocument(jsonAll, full);
 	}
 
-	transient DocumentMeta _meta;
 	public Document.Item getItem(Class<?> clazz, String id) throws Exception {
 		return _meta.getItem(clazz, id);
 	}

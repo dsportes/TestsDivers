@@ -1,7 +1,11 @@
 package serial;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
+
+import serial.DocumentMeta.FieldDescriptor;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -9,7 +13,8 @@ import com.google.gson.JsonObject;
 public class LivrC3 extends Document {
 	
 	public int recomp;	
-	public ArrayList<Integer> prods;
+	public transient ArrayList<Integer> prods;
+	public transient ArrayList<String> names;
 	public int local;
 	public Gac gac;
 	
@@ -150,10 +155,34 @@ public class LivrC3 extends Document {
 		int max = 1;
 		try {
 			Document.register(LivrC3.class);
-			
+
 			String type = "LivrC";
 			String line = "P.1.";
 			String column = "408.10.";
+			
+			int[] x1 = {12, 13};
+			
+			LivrC3 dx = (LivrC3)Document.newDocument(LivrC3.class, line + "@" + column + "_" + type);
+			dx.names = new ArrayList<String>();
+			dx.names.add("toto");
+			dx.names.add("titi");
+
+			@SuppressWarnings("unused")
+			FieldDescriptor fd = dx.fieldDescriptor("names");
+			@SuppressWarnings("unused")
+			Collection<String> cs = dx.getAsCS("names");
+			@SuppressWarnings("unused")
+			String[] sa = dx.getAsAS("names");
+			dx.set("prods", x1);
+			dx.set("local", 2);
+			@SuppressWarnings("unused")
+			int locx = dx.getAsInt("local");
+			LinkedList<String> ls = new LinkedList<String>();
+			ls.add("a");
+			ls.add("b");
+			
+			dx.setCS("names", ls);
+			
 			String text = LivrC2.readFile(column, type);
 			LivrC2 c = new Gson().fromJson(text, LivrC2.class);
 			LivrC3 d = (LivrC3)Document.newDocument(LivrC3.class, line + "@" + column + "_" + type);
