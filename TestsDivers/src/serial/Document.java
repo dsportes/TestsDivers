@@ -165,9 +165,10 @@ public abstract class Document {
 		public String id() { return _meta.id(); }
 	}
 	
+	public static final int max = 100;
+
 	public static byte[] Gzip(byte[] bytes) {
 		try {
-			int max = 1;
 			byte[] bytes2 = null;
 			long t5 = System.currentTimeMillis();
 			for(int i = 0; i < max; i++) {
@@ -187,7 +188,6 @@ public abstract class Document {
 
 	public static byte[] Gunzip(byte[] bytes) {
 		try {
-			int max = 1;
 			byte[] bytes2 = null;
 			byte[] buf = new byte[4096];
 			long t5 = System.currentTimeMillis();

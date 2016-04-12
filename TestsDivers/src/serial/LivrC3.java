@@ -152,7 +152,6 @@ public class LivrC3 extends Document {
 	}
 
 	public static void main(String[] args) {
-		int max = 1;
 		try {
 			Document.register(LivrC3.class);
 
@@ -174,9 +173,9 @@ public class LivrC3 extends Document {
 			@SuppressWarnings("unused")
 			String[] sa = dx.getAsAS("names");
 			dx.set("prods", x1);
-			dx.set("local", 2);
-			@SuppressWarnings("unused")
-			int locx = dx.getAsInt("local");
+			// dx.set("local", 2); // mettre local transient
+			// @SuppressWarnings("unused")
+			// int locx = dx.getAsInt("local");
 			LinkedList<String> ls = new LinkedList<String>();
 			ls.add("a");
 			ls.add("b");
