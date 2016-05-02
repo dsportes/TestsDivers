@@ -1,0 +1,13 @@
+{
+  "name": "TestES6",
+  "main": "index.html",
+  "description": "Test ES6",
+  "version": "1.0",
+  "window": {
+    "title": "Test ES6",
+    "width": 900,
+    "height": 700,
+    "min_width": 480,
+    "min_height": 360
+  }
+}
