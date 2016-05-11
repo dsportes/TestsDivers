@@ -1,6 +1,6 @@
 {
   "name": "TestES6",
-  "main": "index.html",
+  "main": "t1/index.html",
   "description": "Test ES6",
   "version": "1.0",
   "window": {

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns="http://java.sun.com/xml/ns/javaee"
+xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"
+xsi:schemaLocation="http://java.sun.com/xml/ns/javaee
+http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd" version="2.5">
+
+<!-- 
+	<context-param>
+		<param-name>URIParserClass</param-name>
+		<param-value>fr.alplc.postit.Servlet$URIParser</param-value>
+	</context-param>
+ -->
+	<system-properties>
+        <property name="java.util.logging.config.file" value="WEB-INF/logging.properties" />
+    </system-properties>
+	  	 
+	<servlet>
+		<servlet-name>Pages</servlet-name>
+		<servlet-class>ws.Servlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>Pages</servlet-name>
+		<url-pattern>*.x</url-pattern>
+	</servlet-mapping>
+	
+	<mime-mapping>
+        <extension>appcache</extension>
+        <mime-type>text/cache-manifest</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>appi</extension>
+        <mime-type>text/html</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>apps</extension>
+        <mime-type>text/html</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>appa</extension>
+        <mime-type>text/html</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>appx</extension>
+        <mime-type>text/html</mime-type>
+    </mime-mapping>
+
+	<welcome-file-list>
+		<welcome-file>index.html</welcome-file>
+	</welcome-file-list>
+	
+</web-app>
