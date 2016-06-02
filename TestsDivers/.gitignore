@@ -1,3 +1,4 @@
-t1/WEB-INF/classes
+war/WEB-INF/classes
+t1/
 .classpath
 .settings
