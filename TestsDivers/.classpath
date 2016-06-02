@@ -4,5 +4,6 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/json_simple-1.1.jar" sourcepath="D:/Daniel-Dev/products/json_simple-1.1-all/src.zip"/>
 	<classpathentry kind="lib" path="lib/gson-2.6.2.jar"/>
-	<classpathentry kind="output" path="bin"/>
+	<classpathentry kind="lib" path="lib/servlet-api.jar"/>
+	<classpathentry kind="output" path="war/WEB-INF/classes"/>
 </classpath>
