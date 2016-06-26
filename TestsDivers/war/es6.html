@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Test ES6</title>
+		<script>
+		// 'use strict';
+		const APP = {};
+		APP.Test = class Test {
+			go(msg) { document.body.innerHTML = "OK at " + new Date(); }
+		}
+		</script>	
+	</head>
+	<body onload="new APP.Test().go();">
+	Test Failed !
+	</body>
+</html>
