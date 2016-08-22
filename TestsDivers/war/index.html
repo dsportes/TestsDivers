@@ -4,25 +4,34 @@
 		<title>Test ES6</title>
 		<meta charset="utf-8">
 		<base href='/t1/var/'>
-	</head>
-	<link href='fonts/roboto.css' rel='stylesheet' type='text/css'>
-	<link href='fonts/roboto-mono.css' rel='stylesheet' type='text/css'>
-	<link href='fonts/audiowide.css' rel='stylesheet' type='text/css'>
-	<link href='fonts/special-elite.css' rel='stylesheet' type='text/css'>
-	
-	<style>
-		body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
-		#hw {cursor:pointer;}
-		.aw {font-family:'Audiowide';}
-		.rb {font-family:'Roboto';}
-		.rm {font-family:'Roboto Mono'; }
-		.se {font-family:'Special Elite';}
-	</style>
-	<body>
-		<div class="aw">Test Hello World (Audiowide)</div>
-		<div class="se">Test Hello World (Special Elite)</div>
-		<div id="hw" class="rb">Hello World (Roboto)</div>
-		<div id="hw2" class="rm">Hello World (Roboto Mono)</div>
+		
+		<script src="ckeditor/ckeditor.js"></script>
+		
 		<script src="main.js"></script>
+		
+		<link href='fonts/roboto.css' rel='stylesheet' type='text/css'>
+		<link href='fonts/roboto-mono.css' rel='stylesheet' type='text/css'>
+		<link href='fonts/audiowide.css' rel='stylesheet' type='text/css'>
+		<link href='fonts/special-elite.css' rel='stylesheet' type='text/css'>
+	
+		<style>
+			body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
+		</style>
+	</head>
+	<body onload="APP.onload()">
+		<div style="font-family:'Audiowide';">Test Hello World (Audiowide)</div>
+		<div style="font-family:'Special Elite';">Test Hello World (Special Elite)</div>
+		<div id="hw" style="cursor:pointer;font-family:'Roboto';">Hello World (Roboto)</div>
+		<div id="hw2" style="font-family:'Roboto Mono';">Hello World (Roboto Mono)</div>
+		
+		<div id="editor1" contenteditable="true" style="width:400px;border:1px solid red;max-height:400px;overflow-y:auto;">
+			    <h1>Inline Editing & in Action!</h1>
+			    <p>The "div" element that contains this text is now editable.
+        </div>
+		<div id="editor2" contenteditable="true" style="width:400px;border:1px solid blue;max-height:400px;overflow-y:auto;">
+			    <h1>Inline Editing 2 in Action!</h1>
+			    <p>The "div" element that contains this text is now editable.
+        </div>
+		
 	</body>
 </html>
