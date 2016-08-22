@@ -3,19 +3,26 @@
 	<head>
 		<title>Test ES6</title>
 		<meta charset="utf-8">
-		<base href='/t1/loc/'/>
+		<base href='/t1/var/'>
 	</head>
-	<link href='/t1/ext/font-roboto.css' rel='stylesheet' type='text/css'>
-	<link href='/t1/ext/font-roboto-mono.css' rel='stylesheet' type='text/css'>
-	<link href='/t1/ext/font-comfortaa.css' rel='stylesheet' type='text/css'>
+	<link href='fonts/roboto.css' rel='stylesheet' type='text/css'>
+	<link href='fonts/roboto-mono.css' rel='stylesheet' type='text/css'>
+	<link href='fonts/audiowide.css' rel='stylesheet' type='text/css'>
+	<link href='fonts/special-elite.css' rel='stylesheet' type='text/css'>
 	
 	<style>
 		body { height:100%; width:100%; margin:0; padding:0; overflow:hidden; }
+		#hw {cursor:pointer;}
+		.aw {font-family:'Audiowide';}
+		.rb {font-family:'Roboto';}
+		.rm {font-family:'Roboto Mono'; }
+		.se {font-family:'Special Elite';}
 	</style>
 	<body>
-		<div style="font-family:stdss;">Test Hello World</div>
-		<div id="hw" style="font-family:std;">Hello World</div>
-		<div id="hw2" style="font-family:stdmono;">Hello World 2</div>
-		<script src="node_modules/main.js"></script>
+		<div class="aw">Test Hello World (Audiowide)</div>
+		<div class="se">Test Hello World (Special Elite)</div>
+		<div id="hw" class="rb">Hello World (Roboto)</div>
+		<div id="hw2" class="rm">Hello World (Roboto Mono)</div>
+		<script src="main.js"></script>
 	</body>
 </html>
