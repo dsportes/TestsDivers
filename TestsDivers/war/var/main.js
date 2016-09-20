@@ -31,27 +31,27 @@ APP.SubServer = class SubServer extends APP.Server {
 	}
 }
 
-CKEDITOR.disableAutoInline = true;
-
 APP.onload = function() {
 	console.log("SS name " + APP.SubServer.name);
 	const hw = document.getElementById("hw");
 	const hw2 = document.getElementById("hw2");
-	APP.ed1 = document.getElementById("editor1");
-	APP.ed2 = document.getElementById("editor2");
-	
+	APP.inline1 = document.getElementById("inline1");
+	APP.top2 = document.getElementById("top2");
+	APP.bottom2 = document.getElementById("bottom2");
+		
+	// Turn off automatic editor creation first.
 	CKEDITOR.disableAutoInline = true;
-	CKEDITOR.inline(APP.ed1, {language: 'en'} ).on('change', (evt) => {
-		    // getData() returns CKEditor's HTML content.
-		    console.log( 'Total bytes: ' + evt.editor.getData().length );
-		});
 
-	CKEDITOR.inline(APP.ed2, {language: 'en'} ).on('change', (evt) => {
-		    // getData() returns CKEditor's HTML content.
-		    console.log( 'Total bytes: ' + evt.editor.getData().length );
-		});
+	let edt = CKEDITOR.inline(APP.inline1, {
+		// To enable source code editing in a dialog window, inline editors require the "sourcedialog" plugin.
+		extraPlugins: 'sharedspace,sourcedialog',
+		removePlugins: 'floatingspace,maximize,resize',
+		sharedSpaces: {
+			top: APP.top2,
+			bottom: APP.bottom2
+		}
+	} );
 
-	
 	hw.addEventListener("click", () => {
 			const srv = new APP.Server("titi");
 			if (srv instanceof APP.Server)
@@ -65,11 +65,11 @@ APP.onload = function() {
 				console.log("srv2 hérite de Server");
 			const m = srv2.print();
 			hw2.innerHTML = m;
-			ed1.innerHTML = APP.data;
+			// ed1.innerHTML = APP.data;
 		}
 	);
 	hw2.addEventListener("click", () => {
-		APP.data = CKEDITOR.instances.editor1.getData();
+		APP.data = CKEDITOR.instances.editor2.getData();
 		console.log(data);
 	});
 }
