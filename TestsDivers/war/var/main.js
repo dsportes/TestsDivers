@@ -42,16 +42,15 @@ APP.onload = function() {
 	// Turn off automatic editor creation first.
 	CKEDITOR.disableAutoInline = true;
 
-	let edt = CKEDITOR.inline(APP.inline1, {
+	CKEDITOR.inline(APP.inline1, {
 		// To enable source code editing in a dialog window, inline editors require the "sourcedialog" plugin.
 		extraPlugins: 'sharedspace,sourcedialog',
 		removePlugins: 'floatingspace,maximize,resize',
-		sharedSpaces: {
-			top: APP.top2,
-			bottom: APP.bottom2
-		}
+		sharedSpaces: {	top: APP.top2, bottom: APP.bottom2 }
 	} );
+	const edt = CKEDITOR.instances.inline1;
 
+	
 	hw.addEventListener("click", () => {
 			const srv = new APP.Server("titi");
 			if (srv instanceof APP.Server)
