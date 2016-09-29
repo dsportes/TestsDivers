@@ -32,6 +32,8 @@ APP.SubServer = class SubServer extends APP.Server {
 }
 
 APP.onload = function() {
+	const v = sessionStorage.getItem('key');
+	console.log("key=" + v);
 	console.log("SS name " + APP.SubServer.name);
 	const hw = document.getElementById("hw");
 	const hw2 = document.getElementById("hw2");
@@ -68,7 +70,9 @@ APP.onload = function() {
 		}
 	);
 	hw2.addEventListener("click", () => {
-		APP.data = CKEDITOR.instances.editor2.getData();
-		console.log(data);
+		let v = sessionStorage.getItem('key');
+		v = v ? parseInt(v, 10) + 1 : 1;
+		sessionStorage.setItem('key', v);
+		window.location.reload();
 	});
 }
