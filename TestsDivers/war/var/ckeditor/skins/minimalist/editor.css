@@ -8,7 +8,8 @@ For licensing, see LICENSE.md or http://ckeditor.com/license
 .cke_top {margin:0 !important; padding:0 !important; }
 .cke_reset_all, .cke_reset_all * {font-family:Roboto !important; font-size:0.7rem !important; font-weight:bold !important;}
 .cke_combo_button {margin:0 !important; }
-.cke_combo_text {line-height:20px !important; padding-left:3px !important; width:38px !important;}
+.cke_button_icon {width:15px !important;}
+.cke_combo_text {line-height:20px !important; padding-left:3px !important; width:40px !important;}
 .cke_combo_arrow { margin:7px 0 0 !important; }
 .cke_combo_open {height:15px !important; margin:1px 3px 1px !important;}
 a.cke_button {height:15px !important; padding:4px 4px !important;}
