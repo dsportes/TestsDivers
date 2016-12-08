@@ -5,8 +5,12 @@
 		<meta charset="utf-8">
 		<base href='/t1/var/'>
 		
+		<!-- 
 		<script src="ckeditor/ckeditor.js"></script>
 		<script src="ckeditorconfig.js"></script>
+		 -->
+		 
+		<script src="bower_components/showdown/dist/showdown.min.js"></script>
 		
 		<script src="main.js"></script>
 		
@@ -20,6 +24,9 @@
 			#inline1 { padding: 10px; height:1000px; }
 			.edcont { height:60vh; overflow-y: auto; }
 			#canvas { border:1px solid rgb(50,50,50); border-radius:50px; -webkit-border-radius:50px;}
+			#ta {height:40vh; width:95vw; border:1px solid blue; overflow-y: auto;}
+			#md {height:40vh; width:95vw; border:1px solid red; overflow-y: auto;}
+			#btn { color:blue; text-decoration: underline; }
 		</style>
 	</head>
 	<body>
@@ -31,23 +38,30 @@
 		<div><canvas id="canvas" width="275px" height="95px"></canvas></div>
 		<form id="form1"><input type="file"></form>
 		
-	<div id="top2" style="width:350px;">
-		<!-- This div will handle all toolbars. -->
-	</div>
-	<div class="edcont">
-	<div id="inline1" contenteditable="true"> <!-- contenteditable="true" -->
-		<h1><img alt="Saturn V carrying Apollo 11" style="float:right;margin:10px" src="http://sdk.ckeditor.com/samples/assets/sample.jpg"> Apollo 11</h1>
-		<p><strong>Apollo 11</strong> was the spaceflight that landed the first humans, Americans <a href="http://en.wikipedia.org/wiki/Neil_Armstrong">Neil Armstrong</a> and
-			<a href="http://en.wikipedia.org/wiki/Buzz_Aldrin">Buzz Aldrin</a>, on the Moon on July 20, 1969, at 20:18 UTC. Armstrong became the first to step onto the lunar surface 6 hours later on July 21 at 02:56 UTC.</p>
-		<p>Armstrong spent about <s>three and a half</s> two and a half hours outside the spacecraft, Aldrin slightly less; and together they collected 47.5 pounds (21.5&nbsp;kg) of lunar material for return to Earth. A third member of the mission, <a href="http://en.wikipedia.org/wiki/Michael_Collins_(astronaut)">Michael Collins</a>,
-			piloted the
-			<a href="http://en.wikipedia.org/wiki/Apollo_Command/Service_Module">command</a> spacecraft alone in lunar orbit until Armstrong and Aldrin returned to it for the trip back to Earth.
-		</p>
-	</div>
-	</div>
-	<div id="bottom2">
-		<!-- This div will handle all bottom bars. -->
-	</div>
+		<textarea id="ta"></textarea>
+		<div id="btn">View HTML</div>
+		<div id="md"></div>
+		
+		<div id="ck" style="display:none">
+			<div id="top2" style="width:350px;">
+				<!-- This div will handle all toolbars. -->
+			</div>
+			<div class="edcont">
+			<div id="inline1" contenteditable="true"> <!-- contenteditable="true" -->
+				<h1><img alt="Saturn V carrying Apollo 11" style="float:right;margin:10px" src="http://sdk.ckeditor.com/samples/assets/sample.jpg"> Apollo 11</h1>
+				<p><strong>Apollo 11</strong> was the spaceflight that landed the first humans, Americans <a href="http://en.wikipedia.org/wiki/Neil_Armstrong">Neil Armstrong</a> and
+					<a href="http://en.wikipedia.org/wiki/Buzz_Aldrin">Buzz Aldrin</a>, on the Moon on July 20, 1969, at 20:18 UTC. Armstrong became the first to step onto the lunar surface 6 hours later on July 21 at 02:56 UTC.</p>
+				<p>Armstrong spent about <s>three and a half</s> two and a half hours outside the spacecraft, Aldrin slightly less; and together they collected 47.5 pounds (21.5&nbsp;kg) of lunar material for return to Earth. A third member of the mission, <a href="http://en.wikipedia.org/wiki/Michael_Collins_(astronaut)">Michael Collins</a>,
+					piloted the
+					<a href="http://en.wikipedia.org/wiki/Apollo_Command/Service_Module">command</a> spacecraft alone in lunar orbit until Armstrong and Aldrin returned to it for the trip back to Earth.
+				</p>
+			</div>
+			</div>
+			<div id="bottom2">
+				<!-- This div will handle all bottom bars. -->
+			</div>
+		</div>
+	
 	<script>APP.onload();</script>
 	</body>
 </html>

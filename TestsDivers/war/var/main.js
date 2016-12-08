@@ -108,31 +108,47 @@ APP.onload = function() {
 	const v = sessionStorage.getItem('key');
 	console.log("key=" + v);
 	console.log("SS name " + APP.SubServer.name);
+	
+	const ck = document.getElementById("ck");
+	const hasCk = ck && ck.style.display == "block";
+	
+	const converter = new showdown.Converter();
+	const ta = document.getElementById("ta");
+	const md = document.getElementById("md");
+	const btn = document.getElementById("btn");
+	
 	const hw = document.getElementById("hw");
 	const hw2 = document.getElementById("hw2");
-	APP.inline1 = document.getElementById("inline1");
-	APP.top2 = document.getElementById("top2");
-	APP.bottom2 = document.getElementById("bottom2");
+	APP.canvas = document.getElementById("canvas");
+	const form = document.getElementById("form1");
 	
-    APP.canvas = document.getElementById("canvas");
-    const form = document.getElementById("form1");
+	if (hasCk){
+		APP.inline1 = document.getElementById("inline1");
+		APP.top2 = document.getElementById("top2");
+		APP.bottom2 = document.getElementById("bottom2");
 	
+		// Turn off automatic editor creation first.
+		CKEDITOR.disableAutoInline = true;
 	
-	// Turn off automatic editor creation first.
-	CKEDITOR.disableAutoInline = true;
+		CKEDITOR.inline(APP.inline1, {
+			// To enable source code editing in a dialog window, inline editors require the "sourcedialog" plugin.
+			extraPlugins: 'sharedspace,sourcedialog',
+			removePlugins: 'floatingspace,maximize,resize',
+			sharedSpaces: {	top: APP.top2, bottom: APP.bottom2 }
+		} );
+		const edt = CKEDITOR.instances.inline1;
+	}
 
-	CKEDITOR.inline(APP.inline1, {
-		// To enable source code editing in a dialog window, inline editors require the "sourcedialog" plugin.
-		extraPlugins: 'sharedspace,sourcedialog',
-		removePlugins: 'floatingspace,maximize,resize',
-		sharedSpaces: {	top: APP.top2, bottom: APP.bottom2 }
-	} );
-	const edt = CKEDITOR.instances.inline1;
 	
 	APP.getPhoto(form1, canvas, 100, 100, (uint8) =>{
 		console.log(uint8.length);
 	}, (error) =>{
 		console.error(error.message);
+	});
+	
+	btn.addEventListener("click", () => {
+		let text = ta.value;
+		md.innerHTML = converter.makeHtml(text);
 	});
 	
 	hw.addEventListener("click", () => {

@@ -1,0 +1,150 @@
+<link rel="import" href="../bower_components/neon-animation/neon-animation.html">
+<link rel="import" href="../bower_components/paper-dialog/paper-dialog.html">
+
+<link rel="import" href="../themes/shared-styles.html">
+
+<dom-module id="editor-panel">
+<template>
+<style include="shared-styles"></style>
+<style>	
+	:host #editor {	display: flex; flex-direction: column;}
+	:host .bar { margin:0; padding:0; height:var(--btn-h1); overflow:hidden; display: flex; flex-direction: row;}
+		
+	:host .hb { display:inline; }
+    :host .back {width:var(--btn-w1); height:var(--btn-h1); @apply(--color-1); cursor:pointer;}
+    :host .check {width:var(--btn-w1); height:var(--btn-h1); @apply(--color-3);}
+    :host .back:hover {@apply(--color-1-hover);}
+    :host .check:hover {@apply(--color-3-hover);}
+	
+	input[is=iron-input] { @apply(--input-std1); height:var(--btn-h1); padding:0.5rem 1rem; 
+		font-weight:bold; flex-grow: 1; flex-shrink: 1;}
+    input[is=iron-input]:focus { @apply(--input-std1-focus); font-weight:bold !important;}
+    
+    :host .reste { padding:0.3rem 1rem; font-weight:bold; overflow: hidden; flex-grow: 1; flex-shrink: 1; }
+    
+    :host .enbas { flex-grow: 1; flex-shrink: 1; display: flex; flex-direction: column; margin:0; padding:0;}
+    :host #bodyz { @apply(--app-std); flex-grow: 1; flex-shrink: 1; overflow-y: auto; margin:0; padding: 5px; }
+	:host #edcont { @apply(--app-std); flex-grow: 1; flex-shrink: 1; overflow-y: auto; padding:0.5rem 1rem; }
+	:host #edtb { margin:0; padding:0; }
+	
+	@media (min-width: 760px) {
+		:host #edtb { width: 100%;}
+	}
+	@media (max-width: 760px) {
+		:host #edtb { width: 320px; }
+	}
+		
+</style>
+<paper-dialog id="editor" modal class="size-position-left-largepanel" 
+		entry-animation="slide-from-left-animation" exit-animation="slide-left-animation">
+	<div class="bar">
+		<div class="hb">
+			<iron-icon class="back" icon="icons:arrow-back" on-tap="hide"></iron-icon>
+			<paper-ripple class="circle" recenters></paper-ripple>
+		</div>
+		<div hidden$="[[iszoom]]" class="hb">
+			<iron-icon class="check" icon="icons:check" on-tap="save"></iron-icon>
+			<paper-ripple class="circle" recenters></paper-ripple>
+		</div>
+		<input is="iron-input" hidden$="[[iszoom]]" class="reste" value="{{title::input}}">
+		<div  hidden$="[[!iszoom]]" class="reste">[[title]]</div>
+	</div>
+	<div class="enbas" hidden$="[[iszoom]]">
+		<div id="edtb"></div>
+		<div id="edcont"></div>
+	</div>
+	<div hidden$="[[!iszoom]]" id="bodyz"></div>
+</paper-dialog>
+</template>
+
+<script>
+'use strict';
+Polymer({
+	is: 'editor-panel',
+	properties : { 
+		lang : {type:String, value:"xx"},
+		iszoom: {type:Boolean, value:true},
+		//focus: {type:Boolean, value:false}
+	},
+	created: function() {
+		GEN.Editor = this;
+		GEN.addLibs({
+			Editor_ts_fr : "Le titre et/ou le texte ont été modifiés.",
+			Editor_ts_en : "The text has been changed.",
+			Editor_ok_fr : "Intégrer les modifications",
+			Editor_ok_en : "Keep changes",
+			Editor_ko_fr : "Ignorer les modifications",
+			Editor_ko_en : "Ignore changes",
+		});
+	},
+	cl: function(focus) { return focus ? "focus" : "nfocus" ; },
+	ready: function() {	
+		CKEDITOR.disableAutoInline = true;	
+		CKEDITOR.inline(this.$.edcont, {
+			// To enable source code editing in a dialog window, inline editors require the "sourcedialog" plugin.
+			extraPlugins: 'sharedspace,sourcedialog',
+			removePlugins: 'floatingspace,maximize,resize',
+			sharedSpaces: {	top: this.$.edtb }
+		} );
+		this.edt = CKEDITOR.instances.edcont;
+		//this.edt.on("blur", () => { this.focus = false; });
+		//this.edt.on("focus", () => { this.focus = true; });
+	},
+	
+	edit: function(title, body, editbtn){ 
+		this.iszoom = editbtn ? false : true;
+		this.editbtn = editbtn;
+		this.title1 = title;
+		this.title = title;
+		if (this.iszoom) {
+			this.$.bodyz.innerHTML = body;
+		} else {
+			this.edt.setReadOnly(false);
+			this.edt.setData(body);
+			this.body1 = this.edt.getData();
+		}
+		this.$.editor.open();
+	},
+		
+	changed: function() { 
+		if (this.iszoom) return false;
+		this.body = this.edt.getData();
+		return this.title != this.title1 || this.body != this.body1;
+	},
+	
+	hide: function() {
+		if (this.changed()) {
+			GEN.Confirm.show(GEN.lib("Editor_ts"), GEN.lib("Editor_ok"), GEN.lib("Editor_ko"))
+			.then( () => {
+				this.save2();
+			}, () => {
+				this.hide2();
+			});
+		} else
+			this.hide2();
+	},
+	
+	hide2: function() {
+		this.$.editor.close();
+		this.title = null;
+		this.title1 = null;
+		this.body1 = null;
+		this.body = null;
+	},
+	
+	save: function(){
+		if (this.changed())
+			this.save2();
+		else
+			this.hide2();
+	},
+	
+	save2: function(){
+		if (this.editbtn && this.editbtn.save) 
+			this.editbtn.save(this.title, this.body);
+		this.hide2();
+	}
+	
+});
+</script>
+</dom-module>

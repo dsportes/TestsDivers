@@ -1,0 +1,41 @@
+<link rel="import" href="../bower_components/paper-ripple/paper-ripple.html">
+<link rel="import" href="../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../bower_components/iron-icons/iron-icons.html">
+
+<link rel="import" href="../themes/shared-styles.html">
+
+<dom-module id="edit-button">
+<template>
+<style include="shared-styles"></style>
+<style>
+	:host { float:right; cursor:pointer;}
+	:host iron-icon {width:var(--btn-w1); height:var(--btn-h1); @apply(--color-1);}
+	:host iron-icon:hover {@apply(--color-1-hover);}
+</style>
+	<div id="btn" class="icon-button" on-tap="edit">
+		<iron-icon hidden$="[[iszoom]]" icon="icons:create"></iron-icon>
+		<iron-icon hidden$="[[!iszoom]]" icon="icons:search"></iron-icon>
+      	<paper-ripple class="circle" recenters></paper-ripple>
+  	</div>
+</template>
+<script>
+'use strict';
+Polymer({
+	is: 'edit-button',
+	properties : { 
+		iszoom: {type:Boolean, value:false}
+	},
+	edit: function() {
+		const p = this.$.btn.parentNode.parentNode;
+		this.mytitle = p.children[1];
+		this.mybody = p.children[2];
+		GEN.Editor.edit(this.mytitle.innerText, this.mybody.innerHTML, this.iszoom ? null : this);
+	},
+	save: function(title, body){
+		this.mytitle.innerHTML = title;
+		this.mybody.innerHTML = body;
+		this.fire("edit");
+	},
+});
+</script>
+</dom-module>
