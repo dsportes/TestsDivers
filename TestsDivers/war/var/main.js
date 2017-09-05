@@ -1,35 +1,7 @@
 'use strict';
 
 const APP = {}
-
-APP.Server = class Server {
-	constructor(url){
-		this.url = url;
-	}
-	static option(){
-		console.log("static S " + this.name);
-		return "toto";
-	}
-	print(){
-		console.log("instance S " + this.constructor.name);
-		return this.constructor.option() + this.url;
-	}
-}
-
-APP.SubServer = class SubServer extends APP.Server {
-	constructor(url){
-		super(url);
-	}
-	static option(){
-		console.log("static SS " + this.name);
-		return "tata";
-	}
-	print(){
-		console.log("instance SS " + this.constructor.name);
-		// return "sub" + APP.Server.option() + this.url;
-		return "sub" + super.print();
-	}
-}
+const GEN = {}
 
 APP.getPhoto = function(form, canvas, w, h, ok, ko){
 		//	drawImage(image,
@@ -95,6 +67,8 @@ APP.getPhoto = function(form, canvas, w, h, ok, ko){
 };
 
 APP.onload = function() {
+	APP.bcrypt = dcodeIO.bcrypt;
+	
 	let p = window.location.pathname;
 	let q = window.location.search;
 	let h = window.location.hash;
@@ -107,38 +81,21 @@ APP.onload = function() {
 	}
 	const v = sessionStorage.getItem('key');
 	console.log("key=" + v);
-	console.log("SS name " + APP.SubServer.name);
-	
-	const ck = document.getElementById("ck");
-	const hasCk = ck && ck.style.display == "block";
-	
+		
 	const converter = new showdown.Converter();
 	const ta = document.getElementById("ta");
 	const md = document.getElementById("md");
 	const btn = document.getElementById("btn");
 	
+	const _docrypt = document.getElementById("docrypt");
+	const _inp1 = document.getElementById("inp1");
+	const _salt = document.getElementById("salt");
+	const _bc = document.getElementById("bc");
+
 	const hw = document.getElementById("hw");
 	const hw2 = document.getElementById("hw2");
 	APP.canvas = document.getElementById("canvas");
 	const form = document.getElementById("form1");
-	
-	if (hasCk){
-		APP.inline1 = document.getElementById("inline1");
-		APP.top2 = document.getElementById("top2");
-		APP.bottom2 = document.getElementById("bottom2");
-	
-		// Turn off automatic editor creation first.
-		CKEDITOR.disableAutoInline = true;
-	
-		CKEDITOR.inline(APP.inline1, {
-			// To enable source code editing in a dialog window, inline editors require the "sourcedialog" plugin.
-			extraPlugins: 'sharedspace,sourcedialog',
-			removePlugins: 'floatingspace,maximize,resize',
-			sharedSpaces: {	top: APP.top2, bottom: APP.bottom2 }
-		} );
-		const edt = CKEDITOR.instances.inline1;
-	}
-
 	
 	APP.getPhoto(form1, canvas, 100, 100, (uint8) =>{
 		console.log(uint8.length);
@@ -146,27 +103,27 @@ APP.onload = function() {
 		console.error(error.message);
 	});
 	
+	_docrypt.addEventListener("click", () => {
+		var x = 334;
+		console.log(x.toString(16));
+		console.log(x.toString(36));
+		let text = _inp1.value;
+		let salt = APP.bcrypt.genSaltSync(10);
+		let hash = APP.bcrypt.hashSync(text, salt);
+		let h1 = XXH.h64(text, 0xABCD);	// seed = 0xABCD	
+		var s1 = GEN.Crypt.longToBase64(h1);
+		let h2 = XXH.h32(text, 0xABCD);	// seed = 0xABCD	
+		var s2 = GEN.Crypt.intToBase64(h2);
+		_bc.innerHTML = hash + " / " + hash.length + " / " + APP.bcrypt.compareSync(text, hash) + " [" + 
+		h2.toString(16) + " " + s2 + " " + s1 + "]";
+		_salt.innerHTML = salt + " / " + salt.length;
+	});	
+	
 	btn.addEventListener("click", () => {
 		let text = ta.value;
 		md.innerHTML = converter.makeHtml(text);
 	});
 	
-	hw.addEventListener("click", () => {
-			const srv = new APP.Server("titi");
-			if (srv instanceof APP.Server)
-				console.log("srv hérite de Server");
-			hw.innerHTML = srv.print();
-			// const srv2 = Object.assign(new APP.Server(""), {url:"tutu"});
-			const srv2 = Object.assign(new APP.SubServer(""), {url:"tutu"});
-			if (srv2 instanceof APP.Server)
-				console.log("srv2 hérite de SubServer");
-			if (srv2 instanceof APP.SubServer)
-				console.log("srv2 hérite de Server");
-			const m = srv2.print();
-			hw2.innerHTML = m;
-			// ed1.innerHTML = APP.data;
-		}
-	);
 	hw2.addEventListener("click", () => {
 		let v = sessionStorage.getItem('key');
 		v = v ? parseInt(v, 10) + 1 : 1;
