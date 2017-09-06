@@ -108,15 +108,32 @@ APP.onload = function() {
 		console.log(x.toString(16));
 		console.log(x.toString(36));
 		let text = _inp1.value;
-		let salt = APP.bcrypt.genSaltSync(10);
-		let hash = APP.bcrypt.hashSync(text, salt);
-		let h1 = XXH.h64(text, 0xABCD);	// seed = 0xABCD	
-		var s1 = GEN.Crypt.longToBase64(h1);
-		let h2 = XXH.h32(text, 0xABCD);	// seed = 0xABCD	
-		var s2 = GEN.Crypt.intToBase64(h2);
-		_bc.innerHTML = hash + " / " + hash.length + " / " + APP.bcrypt.compareSync(text, hash) + " [" + 
+		let hash = GEN.Crypt.bcrypt(text);
+		let u8 = GEN.Crypt.stringToUint8(hash);
+ 
+		let sha64 = GEN.Base64.encode(GEN.Crypt.sha256(u8), true);
+		let sha64b = GEN.Base64.encode(GEN.Crypt.sha256(hash), true);
+		u8 = GEN.Crypt.asciiToUint8(hash, 32);
+		
+		let t = new Date().getTime();
+		let h0;
+		for(let i = 0; i < 10000; i++)
+			h0 = GEN.Crypt.hashOf(text);
+		console.log("h0:" + (new Date().getTime() - t) + "ms");
+		let h1;
+		for(let i = 0; i < 10000; i++)
+			h1 = XXH.h64(text, 0xABCD);;
+		console.log("h1:" + (new Date().getTime() - t) + "ms");
+		var s1 = GEN.Base64.encode(GEN.Crypt.UINT64ToUint8Array(h1), true);
+		t = new Date().getTime();
+		let h2;
+		for(let i = 0; i < 10000; i++)
+			h2 = XXH.h32(text, 0xABCD);;
+		console.log("h2:" + (new Date().getTime() - t) + "ms");
+		var s2 = GEN.Base64.encode(GEN.Crypt.UINT32ToUint8Array(h2), true);
+		_bc.innerHTML = hash + " / " + hash.length + " / " + sha64 + " / " + GEN.Crypt.bcryptCompare(text, hash) + " [" + h0 + " " +
 		h2.toString(16) + " " + s2 + " " + s1 + "]";
-		_salt.innerHTML = salt + " / " + salt.length;
+		_salt.innerHTML = GEN.Crypt.salt + " / " +  GEN.Crypt.salt.length;
 	});	
 	
 	btn.addEventListener("click", () => {

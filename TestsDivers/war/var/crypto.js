@@ -5,6 +5,17 @@ GEN.Base64 = class Base64 {
 	static get chars2() { return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"; }
 	static get egal() { return "=".charCodeAt(0); }
 
+	static init() {
+		if (!this.lk) {
+			this.lk = new Uint8Array(64);
+			this.lk2 = new Uint8Array(64);
+			for(let i = 0; i < 64; i++){
+				this.lk[i] = this.chars.charCodeAt(i);
+				this.lk2[i] = this.chars2.charCodeAt(i);
+			}
+		}
+	}
+	
 	static isBase64NN(b64){
 		if (!b64) return false;
 		return this.isBase64(b64);
@@ -32,15 +43,8 @@ GEN.Base64 = class Base64 {
 		return true;
 	}
 	
-	static int2Base64(intv) {
-		if (!this.lk) {
-			this.lk = new Uint8Array(64);
-			this.lk2 = new Uint8Array(64);
-			for(let i = 0; i < 64; i++){
-				this.lk[i] = this.chars.charCodeAt(i);
-				this.lk2[i] = this.chars2.charCodeAt(i);
-			}
-		}
+	static intToBase64(intv) {
+		this.init();
 	    let b = [0, 0, 0, 0];
 	    for (let i = 0; i < 4; i++) {
 	        var byte = intv & 0xff;
@@ -49,7 +53,7 @@ GEN.Base64 = class Base64 {
 	    }
 
 		const cx = this.lk2;
-		out += String.fromCharCode(cx[b[0] >> 2]);
+		let out = String.fromCharCode(cx[b[0] >> 2]);
 		out += String.fromCharCode(cx[((b[0] & 3) << 4) | (b[1] >> 4)]);
 		out += String.fromCharCode(cx[((b[1] & 15) << 2) | (b[2] >> 6)]);
 		out += String.fromCharCode(cx[b[2] & 63]);
@@ -57,20 +61,10 @@ GEN.Base64 = class Base64 {
 		out += String.fromCharCode(cx[((b[3] & 3) << 4)]);
 		return out;
 	}
-	
-	
 
 	static encode(bytes, special) {
-		if (!this.lk) {
-			this.lk = new Uint8Array(64);
-			this.lk2 = new Uint8Array(64);
-			for(let i = 0; i < 64; i++){
-				this.lk[i] = this.chars.charCodeAt(i);
-				this.lk2[i] = this.chars2.charCodeAt(i);
-			}
-		}
-		
 		if (bytes == null) return null;
+		this.init();
 		const len = bytes.length;
 		let len2 = Math.ceil(len / 3) * 4;
 		if (special){
@@ -283,23 +277,60 @@ GEN.AES = class AES {
 	
 GEN.Crypt = class Crypt {	
 	static get decoder() { return new TextDecoder("utf-8"); }
+	
 	static get encoder() { return new TextEncoder("utf-8"); }
-	static get power2() { return [1, 256, 65536, 16777216]; }
-	static get defaultIterations() { return 500; }
-	static get defaultSalt() { 
-		if (!this.defaultSaltK)
-			this.defaultSaltK = this.numberTo16(1515178919181945); 
-		return this.defaultSaltK;
+	
+	static uint8ToString(uint8) { return new TextDecoder("utf-8").decode(uint8);}
+
+	static stringToUint8(myString) { return new TextEncoder("utf-8").encode(myString);}
+
+	static asciiToUint8(ascii, len) { 
+		if (!len || len < 0) len = 32;
+		if (!ascii) ascii = "";
+		const uint8 = new Uint8Array(len);
+		for(let i = 0; i < ascii.length && i < len; i++)
+			uint8[i] = ascii.charCodeAt(i);
+		return uint8;
 	}
+
+	static uint8ToHex(uint8){
+		var hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+		var s = '';
+		for (var i = 0; i < uint8.length; i++) {
+		  var code = uint8[i];
+		  s += hex[code >>> 4];
+		  s += hex[code & 0x0F];
+		}
+		return s;
+	}
+	
+	static hexToUint8(hex) {
+		var uint8 = new Uint8Array(hex.length / 2);
+		for(var i = 0, j = 0; i < hex.length - 1; i += 2, j++)
+			uint8[j] = parseInt(hex.substr(i, 2), 16);
+		return uint8;
+	}
+
+	static get salt() { return "$2a$10$kBdas.cIGiNW/ziEj/pZD."; }
+
+	static bcrypt(data) {
+		return dcodeIO.bcrypt.hashSync(data, this.salt).substring(29).replace(/\./g, '-').replace(/\//g, '_');
+	}
+
+	static bcryptCompare(data, hash) {
+		let h = hash.replace(/-/g, '.').replace(/_/g, '/');
+		return dcodeIO.bcrypt.compareSync(data, this.salt + h);
+	}
+
+	static sha256(data) {
+		const sha = sha256.create();
+		return new Uint8Array(sha.update(data).array());
+	}
+
 	static get defaultVector() { 
 		if (!this.defaultVectorK)
-			this.defaultVectorK = this.numberTo16(9876543210); 
+			this.defaultVectorK = new Uint8Array([101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116]); 
 		return this.defaultVectorK;
-	}
-	static get defPBKDF2() { 
-		if (!this.defPBKF2K)
-			this.defPBKF2K = {"name": "PBKDF2", salt:this.defaultSalt, iterations:this.defaultIterations, hash:{name:"SHA-256"} };
-		return this.defPBKF2K;
 	}
 
 	static uint8Equal(a, b){
@@ -309,18 +340,7 @@ GEN.Crypt = class Crypt {
 			if (a[i] != b[i]) return false;
 		return true;
 	}
-	
-//	static hashOf(u8OrB64) {
-//		if (!u8OrB64 || u8OrB64.length == 0) return 0;
-//		const u = typeof u8OrB64 === "string" ? GEN.Base64.decode(u8OrB64) : u8OrB64; 
-//		let h = 0;
-//		const p2 = GEN.Crypt.power2;
-//		for(let i = 0; i < u.length; i++)
-//			h += u[i] * (p2[i % 3]);
-//		return h;
-//	}
-	
-	// static hashOf(s) { return this.intToBase64(this.checksum(s))};
+		
 	static hashOf(s) { return GEN.Base64.intToBase64(this.checksum(s))};
 	
 	static checksum(s) { // hash de Java String
@@ -335,46 +355,27 @@ GEN.Crypt = class Crypt {
 		return hash;
 	}
 
-	static intToBase64(/*long*/intv) {
-	    let b = [0, 0, 0, 0];
-	    for (let i = 0; i < 4; i++) {
-	        var byte = intv & 0xff;
-	        b[i] = byte;
-	        intv = (intv - byte) / 256 ;
-	    }
-	    return GEN.Base64.encode(b, true);
+	static UINT32ToUint8Array(u) {
+	    const b = [0, 0, 0, 0];
+	    b[0] = u._low & 0xff;
+	    b[1] = u._low >> 8;
+	    b[2] = u._high & 0xff;
+	    b[3] = u._high >> 8;
+	    return new Uint8Array(b);
 	}
 
-	static longToBase64(/*long*/intv) {
-	    let b = [0, 0, 0, 0, 0, 0, 0, 0];
-	    for (let i = 0; i < 8; i++) {
-	        var byte = intv & 0xff;
-	        b[i] = byte;
-	        intv = (intv - byte) / 256 ;
-	    }
-	    return GEN.Base64.encode(b, true);
+	static UINT64ToUint8Array(u) {
+	    const b = [0, 0, 0, 0, 0, 0, 0, 0];
+	    b[0] = u._a00 & 0xff;
+	    b[1] = u._a00 >> 8;
+	    b[2] = u._a16 & 0xff;
+	    b[3] = u._a16 >> 8;
+	    b[4] = u._a32 & 0xff;
+	    b[5] = u._a32 >> 8;
+	    b[6] = u._a48 & 0xff;
+	    b[7] = u._a48 >> 8;
+	    return new Uint8Array(b);
 	}
-
-//	static longToByteArray(/*long*/long) {
-//	    // we want to represent the input as a 8-bytes array
-//	    let byteArray = [0, 0, 0, 0, 0, 0, 0, 0];
-//
-//	    for (let index = 0; index < byteArray.length; index ++ ) {
-//	        let byte = long & 0xff;
-//	        byteArray [ index ] = byte;
-//	        long = (long - byte) / 256 ;
-//	    }
-//
-//	    return byteArray;
-//	}
-//
-//	static byteArrayToLong(/*byte[]*/byteArray) {
-//	    let value = 0;
-//	    for (let i = byteArray.length - 1; i >= 0; i--) {
-//	        value = (value * 256) + byteArray[i];
-//	    }
-//	    return value;
-//	};
 
 	static randomNUint8(n){
 		const array = new Uint8Array(n);
@@ -394,88 +395,68 @@ GEN.Crypt = class Crypt {
 		return GEN.Base64.encode(array, true);
 	}
 
-	static pbkdf2(passphraseKey, short) {
-		return new Promise((resolve, reject) => {
-			try {
-			const uint8 = typeof passphraseKey === "string" ? this.stringToUint8(passphraseKey) : passphraseKey;
-			if (GEN.Crypt.hasPBKDF2) {
-				try {
-					crypto.subtle.importKey('raw', uint8, {name: 'PBKDF2'}, false, ['deriveBits'])
-					.then(key => {
-						crypto.subtle.deriveBits(this.defPBKDF2, key, short ? 128 : 256)
-						.then(bits => {
-							const x1 = new Uint8Array(bits);
-						    resolve(x1);
-						}, err => {
-							// {let m; if (m = GEN.log("PBK1 " + err.message)) console.error(m);}
-							GEN.Crypt.hasPBKDF2 = false;
-							resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));
-						});
-					}, err => {
-						// {let m; if (m = GEN.log("PBK2 " + err.message)) console.error(m);}
-						GEN.Crypt.hasPBKDF2 = false;
-						resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));
-					});
-				} catch(err) { // webkit lève une exception hors du promise
-					// {let m; if (m = GEN.log("PBK3 " + err.message)) console.error(m);}
-					GEN.Crypt.hasPBKDF2 = false;
-					resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));					
-				}
-			} else {
-				resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));				
-			};
-			} catch (err) {
-				reject(err);
-			}
-		});
-	}
-		
-	static uint8ToString(uint8) { return this.decoder.decode(uint8);}
-
-	static stringToUint8(myString) { return this.encoder.encode(myString);}
-
-	static uint8ToHex(uint8){
-		var hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
-		var s = '';
-		for (var i = 0; i < uint8.length; i++) {
-		  var code = uint8[i];
-		  s += hex[code >>> 4];
-		  s += hex[code & 0x0F];
-		}
-		return s;
-	}
-	
-	static hexToUint8(hex) {
-		var uint8 = new Uint8Array(hex.length / 2);
-		for(var i = 0, j = 0; i < hex.length - 1; i += 2, j++)
-			uint8[j] = parseInt(hex.substr(i, 2), 16);
-		return uint8;
-	}
-	
-	static sha256(data) {
-		return new Promise((resolve, reject) => {
-			try {
-			const uint8 = typeof data === "string" ? GEN.Crypt.stringToUint8(data) : data;
-		    return crypto.subtle.digest({name: "SHA-256"}, uint8)
-		    .then(result => {
-		    	resolve(new Uint8Array(result));
-		    });
-			} catch (err) {
-				reject(err);
-			}
-		});
-	}
-	
-	static numberTo16(n){
-		var u = new Uint8Array(16);
-		var q = n;
-		for(var i = 0; i < 16; i++) {
-			u[i] = q % 256;
-			q = Math.round(q / 256);
-			if (!q) q = n;
-		}
-		return u;
-	}
+//	static get defaultIterations() { return 500; }
+//	static get defaultSalt() { 
+//		if (!this.defaultSaltK)
+//			this.defaultSaltK = this.numberTo16(1515178919181945); 
+//		return this.defaultSaltK;
+//	}	
+//
+//	static get defPBKDF2() { 
+//		if (!this.defPBKF2K)
+//			this.defPBKF2K = {"name": "PBKDF2", salt:this.defaultSalt, iterations:this.defaultIterations, hash:{name:"SHA-256"} };
+//		return this.defPBKF2K;
+//	}
+//
+//	static pbkdf2(passphraseKey, short) {
+//		return new Promise((resolve, reject) => {
+//			try {
+//			const uint8 = typeof passphraseKey === "string" ? this.stringToUint8(passphraseKey) : passphraseKey;
+//			if (GEN.Crypt.hasPBKDF2) {
+//				try {
+//					crypto.subtle.importKey('raw', uint8, {name: 'PBKDF2'}, false, ['deriveBits'])
+//					.then(key => {
+//						crypto.subtle.deriveBits(this.defPBKDF2, key, short ? 128 : 256)
+//						.then(bits => {
+//							const x1 = new Uint8Array(bits);
+//						    resolve(x1);
+//						}, err => {
+//							// {let m; if (m = GEN.log("PBK1 " + err.message)) console.error(m);}
+//							GEN.Crypt.hasPBKDF2 = false;
+//							resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));
+//						});
+//					}, err => {
+//						// {let m; if (m = GEN.log("PBK2 " + err.message)) console.error(m);}
+//						GEN.Crypt.hasPBKDF2 = false;
+//						resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));
+//					});
+//				} catch(err) { // webkit lève une exception hors du promise
+//					// {let m; if (m = GEN.log("PBK3 " + err.message)) console.error(m);}
+//					GEN.Crypt.hasPBKDF2 = false;
+//					resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));					
+//				}
+//			} else {
+//				resolve(sha256.pbkdf2(uint8, this.defaultSalt, this.defaultIterations, short ? 16 : 32));				
+//			};
+//			} catch (err) {
+//				reject(err);
+//			}
+//		});
+//	}
+//	static sha256(data) {
+//		return new Promise((resolve, reject) => {
+//			try {
+//			const uint8 = typeof data === "string" ? GEN.Crypt.stringToUint8(data) : data;
+//		    return crypto.subtle.digest({name: "SHA-256"}, uint8)
+//		    .then(result => {
+//		    	resolve(new Uint8Array(result));
+//		    });
+//			} catch (err) {
+//				reject(err);
+//			}
+//		});
+//	}
+//	
 		
 };
 
